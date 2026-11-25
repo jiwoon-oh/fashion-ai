@@ -124,8 +124,15 @@ const SUPPORTS_FALLBACK = /^claude-(opus-5|fable-5|sonnet-5-5)/.test(SCORE_MODEL
 let client: Anthropic | null = null;
 const anthropic = () => (client ??= new Anthropic());
 
+// 값 앞뒤 공백·따옴표, true/yes/on 도 켜짐으로 본다
+const mockFlag = () => ["1", "true", "yes", "on"].includes((process.env.MOCK_SCORING ?? "").trim().replace(/^["']|["']$/g, "").toLowerCase());
+
 export const isMock = () =>
-  process.env.MOCK_SCORING === "1" || (!process.env.ANTHROPIC_API_KEY && process.env.NODE_ENV !== "production");
+  mockFlag() || (!process.env.ANTHROPIC_API_KEY?.trim() && process.env.NODE_ENV !== "production");
+
+// 배포 상태 확인용 (비밀 값은 내보내지 않음)
+export const scoringMode = (): "mock" | "live" | "not_configured" =>
+  isMock() ? "mock" : process.env.ANTHROPIC_API_KEY?.trim() ? "live" : "not_configured";
 
 async function askJson(system: string, jpeg: Buffer, schema: object, maxTokens: number): Promise<Record<string, unknown>> {
   if (!process.env.ANTHROPIC_API_KEY) throw new ScoringError("not_configured");

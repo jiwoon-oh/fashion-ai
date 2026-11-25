@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { RUBRIC_VERSION, decideWinner, type BattleResult, type Score } from "@/lib/rubric";
-import { FAVORITES, ScoringError, isMock, pick, roastPhoto, scorePhoto } from "@/lib/scoring";
+import { FAVORITES, ScoringError, isMock, pick, roastPhoto, scorePhoto, scoringMode } from "@/lib/scoring";
 import { adminClient, currentUser } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -27,6 +27,11 @@ function startOfTodayKst() {
   const now = new Date(Date.now() + 9 * 3600_000);
   now.setUTCHours(0, 0, 0, 0);
   return new Date(now.getTime() - 9 * 3600_000);
+}
+
+// GET /api/battle → 지금 채점 모드 확인 (mock / live / not_configured)
+export function GET() {
+  return NextResponse.json({ mode: scoringMode(), mockFlagSet: process.env.MOCK_SCORING !== undefined });
 }
 
 export async function POST(request: NextRequest) {
