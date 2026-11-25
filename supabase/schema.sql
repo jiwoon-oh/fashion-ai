@@ -80,6 +80,11 @@ alter table public.profiles enable row level security;
 alter table public.photo_scores enable row level security;
 alter table public.battles enable row level security;
 
+-- 서버(비밀 키 = service_role)는 읽고 쓸 수 있게 권한을 명시한다.
+-- (최근 Supabase 프로젝트는 새 표에 기본 권한을 자동으로 주지 않을 수 있음)
+grant select, insert, update, delete on public.profiles, public.photo_scores, public.battles to service_role;
+grant usage, select on all sequences in schema public to service_role;
+
 -- 5) 랭킹 계산
 --    kind = 'best' : 내 사진(1P) 중 최고 점수
 --    kind = 'wins' : 이긴 판 수. 같은 (내 사진, 상대 사진) 조합은 1승으로만 셈
