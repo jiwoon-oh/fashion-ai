@@ -1,0 +1,63 @@
+// 고정 채점 기준표. 화면(막대 그래프)과 서버(프롬프트)가 같은 데이터를 쓴다.
+export const RUBRIC_VERSION = "r1";
+
+export type RubricKey = "color" | "fit" | "harmony" | "trend";
+
+export const RUBRIC: { key: RubricKey; label: string; name: string; anchors: [number, string][] }[] = [
+  { key: "color", label: "색감", name: "색 조합", anchors: [
+    [25, "톤이 정리돼 있고 포인트 컬러가 의도적으로 1~2개"],
+    [20, "전체가 잘 어울리고 거슬리는 색이 없음"],
+    [15, "무난하지만 밋밋하거나 한 군데 살짝 어색"],
+    [10, "색끼리 따로 놂. 어색한 조합이 눈에 띔"],
+    [5, "색끼리 싸움. 보자마자 눈이 아픔"],
+  ] },
+  { key: "fit", label: "핏", name: "핏·실루엣", anchors: [
+    [25, "옷 기장·품이 딱 맞고 실루엣 의도가 분명함"],
+    [20, "대체로 잘 맞고 상하의 비율이 좋아 보임"],
+    [15, "무난. 아이템 하나가 살짝 크거나 작음"],
+    [10, "여러 군데 기장·품이 안 맞아 실루엣이 뭉개짐"],
+    [5, "사이즈를 아예 잘못 산 옷이 대부분"],
+  ] },
+  { key: "harmony", label: "조화", name: "아이템 조화", anchors: [
+    [25, "상하의·아우터·신발·소품이 한 콘셉트로 맞춰짐"],
+    [20, "대부분 어울리고 신발·소품도 신경 씀"],
+    [15, "기본 조합은 되는데 신발이나 소품이 따로 놂"],
+    [10, "아이템끼리 장르가 충돌함 (예: 정장 + 등산화)"],
+    [5, "아무거나 집어 입은 느낌"],
+  ] },
+  { key: "trend", label: "센스", name: "센스·트렌드", anchors: [
+    [25, "요즘 감성 + 본인만의 포인트(레이어드·액세서리 등)"],
+    [20, "트렌디하거나 개성 있는 디테일이 하나 이상"],
+    [15, "무난한 데일리룩"],
+    [10, "성의 없어 보이거나 철 지난 느낌"],
+    [5, "잠옷·운동복 그대로 나온 느낌"],
+  ] },
+];
+
+export type Score = {
+  color: number;
+  fit: number;
+  harmony: number;
+  trend: number;
+  total: number;
+  nickname: string;
+  praise: string;
+};
+
+export type BattleResult = {
+  p1: Score;
+  p2: Score;
+  winner: "p1" | "p2";
+  loser: "p1" | "p2";
+  roast: string;
+  cachedSides: { p1: boolean; p2: boolean };
+  recorded: boolean;
+  loggedIn: boolean;
+};
+
+// 동점이면 기준표 순서(색감 → 핏 → 조화 → 센스)로, 그래도 같으면 사진 지문으로 승자를 고정한다
+export function decideWinner(a: Score, b: Score, ha: string, hb: string): "p1" | "p2" {
+  if (a.total !== b.total) return a.total > b.total ? "p1" : "p2";
+  for (const c of RUBRIC) if (a[c.key] !== b[c.key]) return a[c.key] > b[c.key] ? "p1" : "p2";
+  return ha <= hb ? "p1" : "p2";
+}

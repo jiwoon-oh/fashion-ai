@@ -80,7 +80,8 @@
 4. **Authentication → URL Configuration**
    - Site URL: `https://프로젝트명.vercel.app` (아직 없으면 일단 `http://localhost:3000`)
    - Redirect URLs에 추가: `http://localhost:3000/**`, `https://프로젝트명.vercel.app/**`
-5. 참고: 무료 프로젝트는 한동안 아무도 안 쓰면 일시정지될 수 있다. 대시보드에서 다시 켜면 된다.
+5. **SQL Editor → New query** → 저장소의 [`supabase/schema.sql`](supabase/schema.sql) 내용을 통째로 붙여 넣고 **Run**. (표 3개 + 랭킹 계산 함수가 만들어진다. 여러 번 실행해도 안전)
+6. 참고: 무료 프로젝트는 한동안 아무도 안 쓰면 일시정지될 수 있다. 대시보드에서 다시 켜면 된다.
 
 > 아래 구글·카카오 등록에 쓰는 **콜백 주소는 Supabase 주소 하나**다:
 > `https://xxxx.supabase.co/auth/v1/callback`
@@ -133,6 +134,19 @@ ANTHROPIC_API_KEY=
 **② 배포 서버** — Vercel 프로젝트 → **Settings → Environment Variables**에 같은 이름으로 넣는다. 나중에 바꾸면 **Redeploy**.
 
 구글·카카오 키는 Supabase 안에만 들어가므로 여기엔 없다.
+
+선택 항목 (`.env.example` 참고):
+- `SCORE_MODEL` — 채점 모델. 비우면 `claude-opus-5-5`. 싸게 가려면 `claude-haiku-5-5`.
+- `DAILY_SCORE_LIMIT` / `ANON_DAILY_SCORE_LIMIT` — 하루 채점 장수 제한 (기본 20 / 6).
+
+### 2-8. 내 PC에서 실행해 보기
+
+```
+npm install
+npm run dev
+```
+
+→ 브라우저에서 `http://localhost:3000`. `ANTHROPIC_API_KEY`가 없으면 **가짜 점수 모드**로 돌아서 키 없이도 화면을 시험할 수 있다. Supabase 키가 없으면 로그인·랭킹만 꺼진다.
 
 ---
 
