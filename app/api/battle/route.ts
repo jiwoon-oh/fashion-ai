@@ -50,7 +50,8 @@ export async function POST(request: NextRequest) {
   const hash = { p1: sha(p1).slice(0, 32), p2: sha(p2).slice(0, 32) };
 
   const user = await currentUser();
-  const db = adminClient();
+  // 가짜 점수 모드(AI 키 없이 시험 배포)에서는 DB에 점수·배틀을 남기지 않는다 → 랭킹이 가짜로 오염되지 않음
+  const db = isMock() ? null : adminClient();
 
   // 1) 저장된 점수 꺼내기
   const cached: { p1?: Score; p2?: Score } = {};

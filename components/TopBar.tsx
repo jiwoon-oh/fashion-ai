@@ -5,6 +5,9 @@ import { browserClient } from "@/lib/supabase/browser";
 
 type Props = { userName: string | null; authReady: boolean; loginFailed: boolean };
 
+// 네이버는 Supabase "Custom Provider"(식별자 custom:naver)로 붙인다. 설정을 마친 뒤 Vercel에 NEXT_PUBLIC_NAVER_LOGIN=1 을 넣으면 버튼이 보인다.
+const NAVER_ENABLED = process.env.NEXT_PUBLIC_NAVER_LOGIN === "1";
+
 const INVITE_TEXT = "옷빨 배틀 한판 ㄱ? 코디 사진 올리면 AI가 점수 매기고 진 사람 긁어줌 ㅋㅋ";
 
 export default function TopBar({ userName, authReady, loginFailed }: Props) {
@@ -91,7 +94,7 @@ function InviteModal({ onClose }: { onClose: () => void }) {
 
 function LoginModal({ authReady, onClose }: { authReady: boolean; onClose: () => void }) {
   const [msg, setMsg] = useState("");
-  const login = async (provider: "google" | "kakao") => {
+  const login = async (provider: "google" | "kakao" | "custom:naver") => {
     const sb = browserClient();
     if (!sb) return setMsg("아직 로그인 설정 전이라 못 씀 (Supabase 키 넣어야 함)");
     const { error } = await sb.auth.signInWithOAuth({
@@ -107,6 +110,9 @@ function LoginModal({ authReady, onClose }: { authReady: boolean; onClose: () =>
         <button className="btn98" type="button" onClick={() => login("google")} disabled={!authReady}>G 구글로</button>
         <button className="btn98" style={{ background: "#fee500" }} type="button" onClick={() => login("kakao")} disabled={!authReady}>💬 카카오로</button>
       </div>
+      {NAVER_ENABLED && (
+        <button className="btn98" style={{ background: "#03c75a", color: "#fff" }} type="button" onClick={() => login("custom:naver")} disabled={!authReady}>N 네이버로</button>
+      )}
       {!authReady && <p className="rank-empty">지금은 로그인 설정 전이라 버튼이 꺼져 있음</p>}
       {msg && <p>{msg}</p>}
     </Modal>
