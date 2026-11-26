@@ -108,6 +108,7 @@ export default function Battle({ loggedIn, inviteCode, room, roomNew }: Props) {
           url={roomUrl}
           card={{ kind: "invite", url: roomUrl, inviter: roomInfo.hostName }}
           onClose={() => setInviting(false)}
+          context="challenge"
         />
       )}
 
@@ -119,6 +120,8 @@ export default function Battle({ loggedIn, inviteCode, room, roomNew }: Props) {
           url={shareUrl}
           card={{ kind: "result", url: shareUrl, result: shareItem.result, photo: shareItem.photo }}
           onClose={() => setShareItem(null)}
+          context="result"
+          logProps={{ me_won: shareItem.result.winner === "p1", roast_style: shareItem.result.roastStyle ?? null, mode: room ? "challenge" : "local" }}
         />
       )}
     </>

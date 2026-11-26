@@ -1,6 +1,7 @@
 "use client";
 
 import { RUBRIC, type BattleResult } from "./rubric";
+import * as T from "./track";
 
 // 프로토타입의 화면 동작을 거의 그대로 옮겼다.
 // 바뀐 점: 채점을 브라우저의 Claude 대신 우리 서버(/api/battle)에 맡긴다.
@@ -59,7 +60,8 @@ export function asMine(r: BattleResult, me: Side): BattleResult {
 }
 
 export type RoomInfo = { code: string; role: "host" | "guest" | "viewer"; status: "waiting" | "done" | "expired" | "missing"; hostName: string; guestName: string | null };
-type RoomView = { status: "waiting" | "done" | "expired"; role: "host" | "guest" | "viewer"; hostName: string; guestName: string | null; result: BattleResult | null };
+type RoomView = { status: "waiting" | "done" | "expired"; role: "host" | "guest" | "viewer"; hostName: string; guestName: string | null; expiresAt?: string; result: BattleResult | null };
+const ROOM_TTL_MS = 24 * 3600_000; // 서버 lib/rooms.ts 의 유효시간과 같게
 
 type InitOpts = {
   loggedIn: boolean;
@@ -86,6 +88,29 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
   const token = room ? readRoomToken(room) : null;
   const roomHeaders = (): HeadersInit => (token ? { "x-room-token": token } : {});
   const mySide = (): Side => (role === "guest" ? "p2" : "p1");
+
+  // ---------- 로그 (docs/log-design-otbbal.md) ----------
+  type Method = "camera" | "album" | "slot_tap" | "drop" | "paste";
+  const mode = () => !room ? "local" : role === "guest" ? "challenge_guest" : role === "host" ? "challenge_host" : role === "viewer" ? "challenge_viewer" : "challenge";
+  let readyAt = 0; // 두 장(대결방 게스트는 내 사진 한 장)이 다 준비된 시각
+  const secSince = (t: number) => (t ? Math.round((Date.now() - t) / 1000) : null);
+  function logPlay(r: BattleResult, isAgain: boolean) {
+    const me = mySide();
+    const sc = (side: Side) => ({ color: r[side].color, fit: r[side].fit, harmony: r[side].harmony, trend: r[side].trend });
+    T.play({
+      mode: mode(), is_again: isAgain,
+      p1_total: r.p1.total, p2_total: r.p2.total, diff: Math.abs(r.p1.total - r.p2.total),
+      winner: r.winner, tie: r.p1.total === r.p2.total, me_won: r.winner === me,
+      scores: { p1: sc("p1"), p2: sc("p2") },
+      roast_style: r.roastStyle ?? null, mock: r.mock,
+    });
+  }
+  function logScore(t0: number, ok: boolean, error: string | null, mock?: boolean) {
+    T.track("score_done", { mode: mode(), ok, wait_ms: Date.now() - t0, error, mock: mock ?? null }, 4);
+  }
+  function logFail(code: string | undefined, context: string) {
+    if (code === "login_required") T.loginPrompt(context);
+  }
 
   // ---------- 소리 ----------
   let ac: AudioContext | null = null;
@@ -152,13 +177,23 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
     return null;
   }
 
-  async function setPhoto(side: Side, file: File) {
+  async function setPhoto(side: Side, file: File, method: Method) {
     if (room && !(role === "guest" && side === "p2" && !S.result)) return; // 대결방에서는 2P(나)만 올림
-    if (!file || (file.type && !file.type.startsWith("image/"))) { setStatus("이건 사진 파일이 아님 ㅋ 다른 거 ㄱ", "small"); return; }
+    const base = { side, method, replace: !!S[side], sec_since_visit: T.secSinceVisit(), mode: mode() };
+    if (!file || (file.type && !file.type.startsWith("image/"))) {
+      T.track("photo_upload", { ...base, ok: false, fail: "not_image" });
+      setStatus("이건 사진 파일이 아님 ㅋ 다른 거 ㄱ", "small"); return;
+    }
     setStatus("사진 읽는 중…", "small");
     const blob = await prepImage(file);
     if (off.signal.aborted) return;
-    if (!blob) { setStatus("이 사진 형식은 못 읽음 ㅠ 스크린샷 찍어서 그걸 올려줘", "small"); return; }
+    if (!blob) {
+      T.track("photo_upload", { ...base, ok: false, fail: "decode" });
+      setStatus("이 사진 형식은 못 읽음 ㅠ 스크린샷 찍어서 그걸 올려줘", "small"); return;
+    }
+    T.track("photo_upload", { ...base, ok: true, fail: null });
+    T.stage(2);
+    if (room || (side === "p1" ? S.p2 : S.p1)) { T.stage(3); readyAt = Date.now(); }
     const old = S[side];
     if (old) URL.revokeObjectURL(old.url);
     const url = URL.createObjectURL(blob);
@@ -177,7 +212,8 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
     on(inp, "click", () => { audio(); });
     on(inp, "change", () => {
       const f = inp.files && inp.files[0];
-      if (f) setPhoto(inp.dataset.side as Side, f);
+      const method: Method = inp.hasAttribute("capture") ? "camera" : inp.closest(".btnrow") ? "album" : "slot_tap";
+      if (f) setPhoto(inp.dataset.side as Side, f, method);
       inp.value = "";
     });
   });
@@ -188,13 +224,13 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
     on(d, "drop", (e) => {
       e.preventDefault(); d.classList.remove("dragover");
       const f = (e as DragEvent).dataTransfer?.files?.[0];
-      if (f) setPhoto(side, f);
+      if (f) setPhoto(side, f, "drop");
     });
   });
   on(document, "paste", (e) => {
     const item = [...((e as ClipboardEvent).clipboardData?.items || [])].find((i) => i.type.startsWith("image/"));
     const f = item?.getAsFile();
-    if (f) setPhoto(room ? "p2" : !S.p1 ? "p1" : "p2", f);
+    if (f) setPhoto(room ? "p2" : !S.p1 ? "p1" : "p2", f, "paste");
   });
 
   // ---------- 화면 상태 ----------
@@ -248,7 +284,11 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
   async function startBattle() {
     if (room) return joinRoom();
     if (!S.p1 || !S.p2) return;
+    const isAgain = !!S.result;
     clearResult();
+    T.track("battle_start", { mode: mode(), is_again: isAgain, sec_since_ready: secSince(readyAt) }, 4);
+    T.stage(4);
+    const t0 = Date.now();
     const ctl = new AbortController();
     S.ctl = ctl;
     S.running = true;
@@ -268,14 +308,18 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
     } catch (e) {
       if (ctl !== S.ctl || (e instanceof DOMException && e.name === "AbortError")) return;
       const code = (e as { code?: string })?.code;
+      logScore(t0, false, code || "network");
+      logFail(code, "battle");
       setStatus((code && ERR[code]) || "채점하다 서버가 삐끗함. 다시 START 눌러줘", "small");
       S.running = false; setStart();
       return;
     }
+    logScore(t0, true, null, r.mock);
     if (ctl !== S.ctl) return;
     await tension(800, ctl);
     if (ctl !== S.ctl) return;
     reveal(r);
+    logPlay(r, isAgain);
   }
 
   function tension(ms: number, ctl: AbortController) {
@@ -340,7 +384,7 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
     addStamp(r.loser, "lose", "패배");
     // 승패 문구 배너는 없앰(사용자 요청 2026-11-26). 랭킹 안내만 작게 남기고, 없으면 배너 자체를 숨김
     const rankNote = role === "viewer" ? "이미 끝난 대결임. 나도 붙고 싶으면 아래 🗑 새 판"
-      : r.recorded ? "랭킹 반영됨" : r.mock && loggedIn ? "가짜 점수라 랭킹엔 안 올라감" : loggedIn ? "" : "로그인하면 랭킹 올라감";
+      : r.recorded ? "기록됨 · 🏆랭킹에서 등록하면 주간 랭킹에 뜸" : r.mock && loggedIn ? "가짜 점수라 랭킹엔 안 올라감" : loggedIn ? "" : "로그인하고 랭킹 등록하면 올라감";
     setStatus(rankNote, "small");
     $("roast-label").textContent = "AI 한줄평 ▶ " + (room ? sideName(r.loser) : L) + "에게";
     if (role !== "viewer") pushRecent(r.roast);
@@ -440,6 +484,7 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
     } catch { /* 아래에서 안내 */ }
     if (off.signal.aborted) return;
     applyRoom(v);
+    T.track("room_open", { role: v?.role ?? null, status: v?.status ?? "not_found", mode: mode() });
     if (!v) return;
     if (v.status === "done" && v.result) {
       const [a, b] = await Promise.all([fetchPhoto("p1"), fetchPhoto("p2")]);
@@ -486,7 +531,12 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
           const ctl = new AbortController();
           S.ctl = ctl; S.running = true; setStart();
           await tension(800, ctl);
-          if (ctl === S.ctl) reveal(v.result);
+          if (ctl === S.ctl) {
+            reveal(v.result);
+            const created = v.expiresAt ? new Date(v.expiresAt).getTime() - ROOM_TTL_MS : 0;
+            T.track("room_result", { min_since_create: created ? Math.round((Date.now() - created) / 60000) : null, mode: mode() });
+            logPlay(v.result, false);
+          }
         } else if (v?.status === "expired") {
           clearInterval(poll); poll = undefined;
           setStatus(ERR.room_expired, "small");
@@ -501,6 +551,9 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
   // 2P 폰: 내 사진 보내고 결과 받기
   async function joinRoom() {
     if (!S.p2 || S.result || S.running) return;
+    T.track("battle_start", { mode: mode(), is_again: false, sec_since_ready: secSince(readyAt) }, 4);
+    T.stage(4);
+    const t0 = Date.now();
     const ctl = new AbortController();
     S.ctl = ctl; S.running = true; setStart();
     setStatus("AI가 기준표 들고 째려보는 중", "judging");
@@ -516,12 +569,15 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
     } catch (e) {
       if (ctl !== S.ctl || (e instanceof DOMException && e.name === "AbortError")) return;
       const code = (e as { code?: string })?.code;
+      logScore(t0, false, code || "network");
+      logFail(code, "room_join");
       S.running = false;
       if (code === "room_taken") { loadRoom(); return; }
       setStatus((code && ERR[code]) || "채점하다 서버가 삐끗함. 다시 START 눌러줘", "small");
       setStart();
       return;
     }
+    logScore(t0, true, null, v.result?.mock);
     if (ctl !== S.ctl || !v.result) return;
     applyRoom(v);
     const a = await fetchPhoto("p1");
@@ -529,6 +585,7 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
     await tension(800, ctl);
     if (ctl !== S.ctl) return;
     reveal(v.result);
+    logPlay(v.result, false);
   }
 
   // 메인 화면: 1P 사진으로 도전장(링크 대결방) 만들기 → 대결방 화면으로 이동
@@ -539,14 +596,20 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
     setStatus("내 코디 먼저 채점해 두는 중… (2P는 자기 폰에서 붙음)", "judging");
     const fd = new FormData();
     fd.append("p1", S.p1.blob, "p1.jpg");
+    const t0 = Date.now();
     try {
       const res = await fetch("/api/rooms", { method: "POST", body: fd });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.code) throw { code: data?.error };
+      if (!res.ok || !data.code) throw { code: data?.error || "room_failed" };
       saveRoomToken(data.code, data.token);
+      T.track("room_create", { ok: true, wait_ms: Date.now() - t0, error: null }, 3);
+      T.stage(3);
+      T.flush(true); // 바로 다른 화면으로 넘어가니 지금 보낸다
       window.location.href = `/r/${data.code}?new=1`;
     } catch (e) {
       const code = (e as { code?: string })?.code;
+      T.track("room_create", { ok: false, wait_ms: Date.now() - t0, error: code || "network" }, 3);
+      logFail(code, "room_create");
       setStatus((code && ERR[code]) || ERR.room_failed, "small");
       if (btn) btn.disabled = false;
     }
@@ -555,9 +618,16 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
   // ---------- 버튼 ----------
   const challengeBtn = document.getElementById("btn-challenge");
   if (challengeBtn) on(challengeBtn, "click", () => { audio(); makeChallenge(); });
-  on($("btn-start"), "click", () => { audio(); startBattle(); });
+  on($("btn-start"), "click", () => {
+    audio();
+    if (!room && S.result && !S.running) { T.track("replay", { button: "again", mode: mode() }, 6); T.stage(6); }
+    startBattle();
+  });
   on($("btn-reset"), "click", () => {
-    if (room) { window.location.href = "/"; return; }
+    T.track("replay", { button: room ? "room_home" : "new_round", mode: mode(), after_result: !!S.result }, 6);
+    if (S.result) T.stage(6);
+    if (room) { T.flush(true); window.location.href = "/"; return; }
+    readyAt = 0;
     clearResult();
     (["p1", "p2"] as const).forEach((side) => {
       const ph = S[side];
@@ -577,6 +647,8 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
   });
   on($("btn-copy"), "click", async () => {
     const r = S.result; if (!r) return;
+    T.track("share", { channel: "copy_roast", context: "result", roast_style: r.roastStyle ?? null, me_won: r.winner === mySide(), mode: mode() }, 6);
+    T.stage(6);
     const btn = $("btn-copy");
     const line = "[옷빨 배틀] 1P " + r.p1.total + "점 vs 2P " + r.p2.total + "점 — " + r.roast + " " + location.origin;
     try { await navigator.clipboard.writeText(line); btn.textContent = "✅ 복사됨"; }
@@ -592,9 +664,11 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
     const b = e.currentTarget as HTMLElement;
     b.textContent = S.sound ? "🔊 소리 ON" : "🔇 소리 OFF";
     b.setAttribute("aria-pressed", String(S.sound));
+    T.track("setting_change", { key: "sound", value: S.sound });
     if (S.sound) blip();
   });
 
+  T.stage(1);
   if (room) loadRoom();
 
   return () => {

@@ -3,13 +3,15 @@ import { adminClient, currentUser } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-export type RankRow = { rank: number; name: string; value: number; detail: string | null; me: boolean };
+// 주간 랭킹 한 줄: 닉네임(랭킹 등록 때 정한 것), 이번 주 최고 점수, 이번 주 승수
+export type RankRow = { rank: number; name: string; best: number; wins: number; me: boolean };
+export type RankingMe = { loggedIn: boolean; registered: boolean; name: string | null };
 export type RankingResponse = {
   configured: boolean;
   dbError?: boolean;
   weekStart: string;
-  all: { best: RankRow[]; wins: RankRow[] };
-  weekly: { best: RankRow[]; wins: RankRow[] };
+  rows: RankRow[];
+  me: RankingMe;
 };
 
 // 한국 시간 기준 이번 주 월요일 0시
@@ -21,43 +23,36 @@ function startOfWeekKst() {
   return new Date(kst.getTime() - 9 * 3600_000);
 }
 
+// GET /api/ranking → 이번 주 랭킹 (랭킹 등록한 사람만) + 내 등록 상태
 export async function GET() {
   const weekStart = startOfWeekKst();
-  const empty = { best: [], wins: [] };
   const db = adminClient();
-  if (!db) {
-    return NextResponse.json({ configured: false, weekStart: weekStart.toISOString(), all: empty, weekly: empty } satisfies RankingResponse);
-  }
   const user = await currentUser();
-  let dbError = false;
+  const guest: RankingMe = { loggedIn: !!user, registered: false, name: null };
+  if (!db) {
+    return NextResponse.json({ configured: false, weekStart: weekStart.toISOString(), rows: [], me: guest } satisfies RankingResponse);
+  }
 
-  const load = async (kind: "best" | "wins", since: Date | null): Promise<RankRow[]> => {
-    const { data, error } = await db.rpc("get_ranking", { kind, since: since?.toISOString() ?? null, max_rows: 50 });
-    if (error) {
-      console.error("get_ranking", error.message);
-      dbError = true;
-      return [];
-    }
-    return (data ?? []).map((r: { rank: number; user_id: string; display_name: string; value: number; detail: string | null }) => ({
-      rank: Number(r.rank),
-      name: r.display_name,
-      value: r.value,
-      detail: r.detail,
-      me: !!user && r.user_id === user.id,
-    }));
-  };
-
-  const [allBest, allWins, wkBest, wkWins] = await Promise.all([
-    load("best", null),
-    load("wins", null),
-    load("best", weekStart),
-    load("wins", weekStart),
+  const [ranking, profile] = await Promise.all([
+    db.rpc("get_weekly_ranking", { since: weekStart.toISOString(), max_rows: 50 }),
+    user ? db.from("profiles").select("rank_name").eq("id", user.id).maybeSingle() : Promise.resolve(null),
   ]);
+  if (ranking.error) console.error("get_weekly_ranking", ranking.error.message);
+  if (profile?.error) console.error("ranking me", profile.error.message);
+
+  const rankName = (profile?.data?.rank_name as string | null | undefined) ?? null;
+  const rows = ((ranking.data ?? []) as { rank: number; user_id: string; rank_name: string; best: number; wins: number }[]).map((r) => ({
+    rank: Number(r.rank),
+    name: r.rank_name,
+    best: r.best,
+    wins: r.wins,
+    me: !!user && r.user_id === user.id,
+  }));
   return NextResponse.json({
     configured: true,
-    dbError,
+    dbError: !!ranking.error || !!profile?.error,
     weekStart: weekStart.toISOString(),
-    all: { best: allBest, wins: allWins },
-    weekly: { best: wkBest, wins: wkWins },
+    rows,
+    me: { loggedIn: !!user, registered: !!rankName, name: rankName },
   } satisfies RankingResponse);
 }

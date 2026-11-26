@@ -15,6 +15,9 @@ export const sha = (b: Buffer | string) => createHash("sha256").update(b).digest
 export const photoHash = (b: Buffer) => sha(b).slice(0, 32);
 export const isJpeg = (b: Buffer) => b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
 
+/** 한줄평 + 스타일 번호(로그용: "s1"~"s25" / "bank" / "mock") */
+export type Roast = { roast: string; style: string };
+
 /** 하루 제한 초과 등 채점 전에 막힌 경우 */
 export class LimitError extends Error {
   constructor(public code: "daily_limit" | "login_required") {
@@ -59,7 +62,7 @@ export async function readJpeg(f: FormDataEntryValue | null): Promise<Buffer | s
 export async function getScores(
   photos: { img: Buffer; hash: string }[],
   ctx: Ctx,
-): Promise<{ scores: Map<string, Score>; fresh: Set<string>; roasts: Map<string, string> }> {
+): Promise<{ scores: Map<string, Score>; fresh: Set<string>; roasts: Map<string, Roast> }> {
   const scoreDb = ctx.mock ? null : ctx.db; // 가짜 점수는 DB 점수 캐시에 안 남긴다
   const scores = new Map<string, Score>();
   const hashes = [...new Set(photos.map((p) => p.hash))];
@@ -90,13 +93,13 @@ export async function getScores(
     if ((count ?? 0) + todo.length > limit) throw new LimitError(ctx.user ? "daily_limit" : "login_required");
   }
 
-  const roasts = new Map<string, string>();
+  const roasts = new Map<string, Roast>();
   await Promise.all(
     todo.map(async (h) => {
       const img = photos.find((p) => p.hash === h)!.img;
-      const { score, roast } = await scorePhoto(img, h, ctx.recent);
+      const { score, roast, style } = await scorePhoto(img, h, ctx.recent);
       scores.set(h, score);
-      roasts.set(h, roast);
+      roasts.set(h, { roast, style });
       if (scoreDb) {
         const { error } = await scoreDb.from("photo_scores").upsert(
           { hash: h, rubric_version: RUBRIC_VERSION, ...score, scored_by: ctx.user?.id ?? null, scored_ip: ctx.ipHash },
@@ -117,19 +120,20 @@ export async function getScores(
  */
 export async function pickRoast(
   ctx: Ctx,
-  loser: { img: Buffer; score: Score; fresh?: string },
+  loser: { img: Buffer; score: Score; fresh?: Roast },
   winner: Score,
-): Promise<string> {
-  if (ctx.mock) return "(가짜 점수) " + fallbackRoast(ctx.recent);
-  let roast = guardRoast(loser.fresh, ctx.recent) ?? "";
-  if (!roast) {
-    try {
-      roast = guardRoast(await roastPhoto(loser.img, loser.score, winner, ctx.recent), ctx.recent) ?? "";
-    } catch {
-      roast = "";
-    }
+): Promise<Roast> {
+  if (ctx.mock) return { roast: "(가짜 점수) " + fallbackRoast(ctx.recent), style: "mock" };
+  const fresh = guardRoast(loser.fresh?.roast, ctx.recent);
+  if (fresh) return { roast: fresh, style: loser.fresh!.style };
+  try {
+    const r = await roastPhoto(loser.img, loser.score, winner, ctx.recent);
+    const text = guardRoast(r.roast, ctx.recent);
+    if (text) return { roast: text, style: r.style };
+  } catch {
+    /* 아래 은행 문장 */
   }
-  return roast || fallbackRoast(ctx.recent);
+  return { roast: fallbackRoast(ctx.recent), style: "bank" };
 }
 
 export function judge(s1: Score, s2: Score, h1: string, h2: string) {

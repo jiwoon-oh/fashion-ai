@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import RankingBoard from "@/components/RankingBoard";
+import { authConfigured } from "@/lib/supabase/config";
 
 export const metadata: Metadata = { title: "랭킹 · 옷빨 배틀" };
 
@@ -13,9 +14,9 @@ export default function RankingPage() {
       <header>
         <h1 className="wordart">명예의 전당</h1>
         <br />
-        <p className="sub">왼쪽은 전체, 오른쪽은 이번 주. 로그인한 사람의 1P 사진만 올라감</p>
+        <p className="sub">이번 주 랭킹. 랭킹 등록한 사람만 닉네임으로 올라감</p>
       </header>
-      <RankingBoard />
+      <RankingBoard authReady={authConfigured()} />
     </div>
   );
 }

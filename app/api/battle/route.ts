@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     const { scores, fresh, roasts } = await getScores([{ img: p1, hash: hash.p1 }, { img: p2, hash: hash.p2 }], ctx);
     const s1 = scores.get(hash.p1)!, s2 = scores.get(hash.p2)!;
     const { winner, loser } = judge(s1, s2, hash.p1, hash.p2);
-    const roast = await pickRoast(
+    const { roast, style: roastStyle } = await pickRoast(
       ctx,
       { img: loser === "p1" ? p1 : p2, score: loser === "p1" ? s1 : s2, fresh: roasts.get(hash[loser]) },
       winner === "p1" ? s1 : s2,
@@ -53,6 +53,7 @@ export async function POST(request: NextRequest) {
       winner,
       loser,
       roast,
+      roastStyle,
       cachedSides: { p1: !fresh.has(hash.p1), p2: !fresh.has(hash.p2) || hash.p1 === hash.p2 },
       ...rec,
       mock: ctx.mock,

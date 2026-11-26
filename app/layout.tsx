@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import Tracker from "@/components/Tracker";
+import { currentUser } from "@/lib/supabase/server";
 
 // 링크 미리보기(카톡·페북·X 등)에 쓰는 사이트 주소. Vercel이 실제 서비스 주소를 넣어 준다
 const SITE = process.env.NEXT_PUBLIC_SITE_URL
@@ -24,7 +26,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const user = await currentUser().catch(() => null);
   return (
     <html lang="ko">
       <head>
@@ -34,6 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Jua&family=Press+Start+2P&display=swap" />
       </head>
       <body>
+        <Tracker loggedIn={!!user} />
         <div className="marquee" aria-hidden="true">
           <div className="marquee-track">
             <span>★☆ 오늘의 옷빨왕은 누구냐 ☆★</span>

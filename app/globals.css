@@ -550,6 +550,26 @@ body.tension::after {
 .rank-list .who small { display: block; color: var(--gray98-dark); font-size: 11px; overflow: hidden; text-overflow: ellipsis; }
 .rank-list .val { font-family: var(--pixel); font-size: 12px; color: var(--hot-deep); font-variant-numeric: tabular-nums; }
 .rank-empty { padding: 18px 10px; text-align: center; color: var(--gray98-dark); font-size: 14px; line-height: 1.5; }
+/* 주간 랭킹 한 칸 (모바일 우선): 순위 / 닉네임 / 점수 / 승수 */
+.rank-weekly { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 520px; margin: 0 auto; }
+.rank-weekly .win98 { transform: none; }
+.rank-weekly .p2 .titlebar { background: linear-gradient(90deg, #800060, var(--hot)); }
+.rank-weekly .winbody { padding: 6px; }
+.rank-table li { grid-template-columns: 2.2em minmax(0, 1fr) 3.6em 3em; }
+.rank-table .val { text-align: right; }
+.rank-table .rank-head { font-family: var(--pixel); font-size: 10px; color: var(--gray98-dark); background: var(--gray98); padding: 5px 8px; }
+.rank-table .rank-head .val { color: var(--gray98-dark); font-size: 10px; }
+.rank-reg { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.rank-register { border: 0; cursor: pointer; font-size: 18px; min-height: 48px; }
+.rank-reg-hint { margin: 0; font-size: 13px; text-align: center; }
+.rank-reg .rank-reg-hint { background: rgba(255, 255, 255, .85); border: 2px solid var(--ink); padding: 2px 8px; }
+.rank-myname { margin: 0; background: rgba(255, 255, 255, .85); border: 2px solid var(--ink); padding: 4px 10px; display: flex; gap: 8px; align-items: center; }
+.rank-nameform { width: 100%; max-width: 520px; margin: 0 auto; transform: none; }
+.rank-nameform form { display: flex; flex-direction: column; gap: 8px; padding: 12px; }
+.rank-nameform p { margin: 0; }
+.rank-name-input { font: inherit; font-size: 18px; padding: 10px; border: 2px solid; border-color: var(--gray98-dark) var(--paper) var(--paper) var(--gray98-dark); background: var(--paper); width: 100%; box-sizing: border-box; }
+.rank-nameform .btnrow { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.rank-nameform .btnrow .btn98 { min-height: 44px; }
 .rank-note { text-align: center; font-size: 13px; }
 .rank-note span { background: rgba(255, 255, 255, .85); border: 2px solid var(--ink); padding: 3px 8px; display: inline-block; }
 
@@ -558,6 +578,7 @@ body.tension::after {
   .rank-grid .winbody { padding: 4px; }
   .rank-list li { grid-template-columns: 1.8em 1fr auto; padding: 5px 4px; gap: 4px; }
   .rank-list .val { font-size: 10px; }
+  .rank-table li { grid-template-columns: 1.8em minmax(0, 1fr) 3.4em 2.8em; }
   .chip { font-size: 13px; padding: 4px 8px; }
 }
 

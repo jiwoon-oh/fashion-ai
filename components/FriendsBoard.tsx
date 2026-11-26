@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { FriendSummary, FriendsResponse } from "@/lib/friends";
 import ShareSheet from "./ShareSheet";
 import { withdrawAccount } from "@/lib/account-client";
+import { track } from "@/lib/track";
 
 const INVITE_TEXT = "옷빨 배틀 친구하자 ㅋㅋ 이 링크로 들어와서 로그인하면 서로 최고 점수·승수 볼 수 있음";
 
@@ -21,6 +22,7 @@ export default function FriendsBoard() {
         const d = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(d.error ?? "error");
         setData(d as FriendsResponse);
+        track("friends_view", { friend_count: (d as FriendsResponse).friends?.length ?? 0 });
       })
       .catch((e: Error) => setFailed(e.message === "not_configured" ? "아직 DB 연결 전이라 친구 기능을 못 씀" : "친구 목록 불러오다 삐끗함 ㅠ 새로고침 ㄱ"));
   }, []);
@@ -103,6 +105,7 @@ export default function FriendsBoard() {
           url={inviteUrl}
           card={{ kind: "invite", url: inviteUrl, inviter: data.me.name }}
           onClose={() => setSharing(false)}
+          context="invite"
         />
       )}
     </>

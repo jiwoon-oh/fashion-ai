@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { KAKAO_JS_KEY, kakaoShare, preloadKakao } from "@/lib/kakao";
 import { makeShareCard, type CardInput } from "@/lib/share-card";
 import Modal from "./Modal";
+import { stage, track, withVia } from "@/lib/track";
 
 type Props = {
   title: string; // 창 제목
@@ -12,15 +13,28 @@ type Props = {
   url: string; // 보낼 링크
   card: CardInput; // 스토리용 이미지 내용
   onClose: () => void;
+  /** 로그용: result = 결과 공유, challenge = 도전장, invite = 친구 초대 */
+  context: "result" | "challenge" | "invite";
+  /** 로그용: 공유 이벤트에 같이 남길 값 (me_won, roast_style 등) */
+  logProps?: Record<string, unknown>;
 };
 
-export default function ShareSheet({ title, lead, text, url, card, onClose }: Props) {
+export default function ShareSheet({ title, lead, text, url: baseUrl, card, onClose, context, logProps }: Props) {
+  // 채널마다 링크에 via=<채널> 을 붙인다 → 그 링크로 들어온 사람은 로그에서 source "share"
+  const url = baseUrl;
+  const urlFor = (ch: string) => withVia(baseUrl, ch);
+  const log = (channel: string) => {
+    track("share", { channel, context, ...logProps }, context === "result" ? 6 : null);
+    if (context === "result") stage(6);
+  };
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const cardRef = useRef<Promise<Blob> | null>(null);
   const getCard = () => (cardRef.current ??= makeShareCard(card));
 
+  const opened = useRef(false); // 개발 모드에서 effect 가 두 번 돌아도 한 번만 남기게
   useEffect(() => {
+    if (!opened.current) { opened.current = true; track("share_open", { context, ...logProps }); }
     preloadKakao();
     getCard().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -30,22 +44,23 @@ export default function ShareSheet({ title, lead, text, url, card, onClose }: Pr
   const enc = encodeURIComponent;
   const open = (u: string) => window.open(u, "_blank", "noopener,noreferrer");
 
-  const copy = async (msg = "✅ 복사됨! 붙여넣기 하면 돼") => {
-    try { await navigator.clipboard.writeText(`${text}\n${url}`); flash(msg); }
+  const copy = async (msg = "✅ 복사됨! 붙여넣기 하면 돼", ch = "copy_link") => {
+    try { await navigator.clipboard.writeText(`${text}\n${urlFor(ch)}`); flash(msg); }
     catch { flash("복사가 막힘 ㅠ 위 글을 길게 눌러서 복사해줘"); }
   };
 
   const kakao = async () => {
-    if (!KAKAO_JS_KEY) return copy("카톡 공유 준비 전이라 링크를 복사했어 → 카톡 채팅방에 붙여넣기");
+    log("kakao");
+    if (!KAKAO_JS_KEY) return copy("카톡 공유 준비 전이라 링크를 복사했어 → 카톡 채팅방에 붙여넣기", "kakao");
     await preloadKakao();
     const ok = kakaoShare({
       title: "옷빨 배틀",
       description: text,
-      url,
+      url: urlFor("kakao"),
       imageUrl: new URL("/og.png", window.location.origin).toString(),
       buttonTitle: card.kind === "result" ? "나도 붙어보기" : "배틀 하러 가기",
     });
-    if (!ok) copy("카톡을 못 열었어 → 링크 복사했으니 카톡에 붙여넣기");
+    if (!ok) copy("카톡을 못 열었어 → 링크 복사했으니 카톡에 붙여넣기", "kakao");
   };
 
   // 인스타그램: 웹에서는 인스타 글쓰기·스토리 화면을 링크로 직접 여는 공식 방법이 없다.
@@ -55,6 +70,7 @@ export default function ShareSheet({ title, lead, text, url, card, onClose }: Pr
   useEffect(() => () => { if (insta) URL.revokeObjectURL(insta.img); }, [insta]);
 
   const openInsta = async () => {
+    log("insta_preview");
     setBusy(true);
     try {
       const blob = await getCard();
@@ -69,7 +85,8 @@ export default function ShareSheet({ title, lead, text, url, card, onClose }: Pr
 
   const sendInsta = async () => {
     if (!insta) return;
-    navigator.clipboard?.writeText(url).catch(() => {}); // 링크 스티커에 붙여넣을 링크
+    log("insta_send");
+    navigator.clipboard?.writeText(urlFor("insta")).catch(() => {}); // 링크 스티커에 붙여넣을 링크
     if (insta.canShare) {
       try {
         await navigator.share({ files: [insta.file] });
@@ -83,6 +100,8 @@ export default function ShareSheet({ title, lead, text, url, card, onClose }: Pr
 
   const saveImage = () => {
     if (!insta) return;
+    log("insta_save");
+    navigator.clipboard?.writeText(urlFor("insta")).catch(() => {});
     const a = document.createElement("a");
     a.href = insta.img;
     a.download = "otbbal-battle.png";
@@ -90,8 +109,9 @@ export default function ShareSheet({ title, lead, text, url, card, onClose }: Pr
   };
 
   const more = async () => {
-    try { await navigator.share({ title: "옷빨 배틀", text, url }); }
-    catch (e) { if (!(e instanceof DOMException && e.name === "AbortError")) copy(); }
+    log("native");
+    try { await navigator.share({ title: "옷빨 배틀", text, url: urlFor("native") }); }
+    catch (e) { if (!(e instanceof DOMException && e.name === "AbortError")) copy(undefined, "native"); }
   };
 
   const canNativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
@@ -129,10 +149,10 @@ export default function ShareSheet({ title, lead, text, url, card, onClose }: Pr
       <div className="share-grid">
         <button type="button" className="share-btn kakao" onClick={kakao}><b>💬</b>카카오톡</button>
         <button type="button" className="share-btn insta" onClick={openInsta} disabled={busy}><b>📸</b>인스타그램</button>
-        <button type="button" className="share-btn threads" onClick={() => open(`https://www.threads.net/intent/post?text=${enc(`${text} ${url}`)}`)}><b>@</b>스레드</button>
-        <button type="button" className="share-btn x" onClick={() => open(`https://twitter.com/intent/tweet?text=${enc(text)}&url=${enc(url)}`)}><b>𝕏</b>X(트위터)</button>
-        <button type="button" className="share-btn fb" onClick={() => open(`https://www.facebook.com/sharer/sharer.php?u=${enc(url)}`)}><b>f</b>페이스북</button>
-        <button type="button" className="share-btn" onClick={() => copy()}><b>📋</b>링크 복사</button>
+        <button type="button" className="share-btn threads" onClick={() => { log("threads"); open(`https://www.threads.net/intent/post?text=${enc(`${text} ${urlFor("threads")}`)}`); }}><b>@</b>스레드</button>
+        <button type="button" className="share-btn x" onClick={() => { log("x"); open(`https://twitter.com/intent/tweet?text=${enc(text)}&url=${enc(urlFor("x"))}`); }}><b>𝕏</b>X(트위터)</button>
+        <button type="button" className="share-btn fb" onClick={() => { log("facebook"); open(`https://www.facebook.com/sharer/sharer.php?u=${enc(urlFor("facebook"))}`); }}><b>f</b>페이스북</button>
+        <button type="button" className="share-btn" onClick={() => { log("copy_link"); copy(); }}><b>📋</b>링크 복사</button>
         {canNativeShare && <button type="button" className="share-btn" onClick={more}><b>📤</b>다른 앱</button>}
       </div>
       <div className="linkbox">{text}<br />{url}</div>

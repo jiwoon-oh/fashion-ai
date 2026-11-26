@@ -6,6 +6,7 @@ import { browserClient } from "@/lib/supabase/browser";
 import Modal from "./Modal";
 import ShareSheet from "./ShareSheet";
 import { withdrawAccount } from "@/lib/account-client";
+import { loginIntent } from "@/lib/track";
 
 type Props = { userName: string | null; inviteCode: string | null; authReady: boolean; loginFailed: boolean };
 
@@ -73,6 +74,7 @@ export default function TopBar({ userName, inviteCode, authReady, loginFailed }:
           url={inviteUrl}
           card={{ kind: "invite", url: inviteUrl, inviter: userName }}
           onClose={() => setOpen(null)}
+          context="invite"
         />
       )}
       {open === "account" && userName && <AccountModal name={userName} onClose={() => setOpen(null)} />}
@@ -85,11 +87,12 @@ export default function TopBar({ userName, inviteCode, authReady, loginFailed }:
 // X 는 Supabase 의 "X / Twitter (OAuth 2.0)" 방식 (provider 이름 "x")
 type Provider = "google" | "kakao" | "x";
 
-function LoginModal({ authReady, onClose }: { authReady: boolean; onClose: () => void }) {
+export function LoginModal({ authReady, onClose }: { authReady: boolean; onClose: () => void }) {
   const [msg, setMsg] = useState("");
   const login = async (provider: Provider) => {
     const sb = browserClient();
     if (!sb) return setMsg("아직 로그인 설정 전이라 못 씀 (Supabase 키 넣어야 함)");
+    loginIntent(provider);
     const { error } = await sb.auth.signInWithOAuth({
       provider,
       options: { redirectTo: `${window.location.origin}/auth/callback` },
@@ -98,7 +101,7 @@ function LoginModal({ authReady, onClose }: { authReady: boolean; onClose: () =>
   };
   return (
     <Modal title="로그인.exe" onClose={onClose}>
-      <p>로그인하면 1P(내 사진) 점수랑 승수가 랭킹에 올라가고, 친구들 점수도 볼 수 있음.</p>
+      <p>로그인하고 랭킹 등록(닉네임 정하기)하면 1P(내 사진) 점수랑 승수가 주간 랭킹에 올라가고, 친구들 점수도 볼 수 있음.</p>
       <div className="btnrow">
         <button className="btn98" type="button" onClick={() => login("google")} disabled={!authReady}>G 구글로</button>
         <button className="btn98" style={{ background: "#fee500" }} type="button" onClick={() => login("kakao")} disabled={!authReady}>💬 카카오로</button>

@@ -78,7 +78,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     // 한줄평은 진 쪽 사진을 보고 만든다. 1P가 졌으면 저장해 둔 1P 사진을 꺼낸다
     const p1 = loser === "p1" ? await getPhoto(db, code, "p1") : null;
-    const roast = loser === "p2" || !p1
+    const { roast, style: roastStyle } = loser === "p2" || !p1
       ? await pickRoast(ctx, { img: p2, score: s2, fresh: roasts.get(h2) }, s1)
       : await pickRoast(ctx, { img: p1, score: s1 }, s2);
 
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     const result = {
-      p1: s1, p2: s2, winner, loser, roast,
+      p1: s1, p2: s2, winner, loser, roast, roastStyle,
       cachedSides: { p1: room.p1Cached, p2: !fresh.has(h2) || h2 === room.p1Hash },
       mock: ctx.mock,
     };

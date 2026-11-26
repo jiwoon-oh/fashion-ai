@@ -180,3 +180,138 @@ $$;
 
 revoke all on function public.get_ranking(text, timestamptz, int) from public, anon, authenticated;
 grant execute on function public.get_ranking(text, timestamptz, int) to service_role;
+
+-- 6) 행동 로그 (docs/log-design-otbbal.md). 옷빨 전용 (돌수제비는 자기 표 dolsujebi_log 를 씀). 한 줄 = 이벤트 하나
+--    사진·사진 지문·IP·닉네임·한줄평 원문은 넣지 않는다. 쓰기는 서버(/api/log)만.
+create table if not exists public.events (
+  id bigint generated always as identity primary key,
+  event_id uuid not null unique,              -- 브라우저가 만든 값. 재전송돼도 한 줄만
+  event_time timestamptz not null default now(), -- 서버 수신 시각 (분석 기준)
+  client_time timestamptz,
+  app text not null check (app in ('dolsu', 'otbbal')),
+  user_id text not null,                      -- 익명 브라우저 id
+  auth_uid uuid references auth.users (id) on delete set null, -- 로그인했으면 계정 id (탈퇴하면 연결만 끊김)
+  session_id text not null,                   -- 15분 동안 이벤트 없으면 새 세션
+  event_name text not null,
+  stage smallint,
+  device text,
+  browser text,
+  source text,
+  source_detail text,
+  is_internal boolean not null default false, -- 팀원 트래픽 (분석 때 제외)
+  props jsonb not null default '{}'
+);
+create index if not exists events_app_time on public.events (app, event_time);
+create index if not exists events_session on public.events (session_id);
+alter table public.events enable row level security;  -- 정책 없음 = 브라우저 키로는 못 읽고 못 씀
+grant select, insert on public.events to service_role;
+grant usage, select on all sequences in schema public to service_role;
+
+-- 6-1) 옷빨 지표 뷰: SQL Editor 에서 select * from v_otbbal_daily; 처럼 한 줄로 본다 (팀 트래픽·테스트 채점 제외)
+--      v_otbbal_sessions  세션 한 줄 요약 (다른 뷰의 바탕)
+--      v_otbbal_daily     날짜·처음 유입 경로별 방문, 첫 플레이 전환율(H2-a/H2-b), 2판 이상 비율(H3), 공유
+--      v_otbbal_funnel    단계 1~6 도달 세션 수 (모드 구분 없이 / 모드별은 문서의 쿼리)
+--      v_otbbal_first_play 첫 플레이까지 걸린 초 중앙값
+create or replace view public.v_otbbal_sessions with (security_invoker = true) as
+select
+  session_id,
+  min(user_id) as user_id,
+  min(event_time) as started_at,
+  (min(event_time) at time zone 'Asia/Seoul')::date as day,
+  min(source) filter (where event_name = 'visit') as source,
+  min(source_detail) filter (where event_name = 'visit') as source_detail,
+  min(props->>'ft_source') filter (where event_name = 'visit') as ft_source,
+  min(device) as device,
+  min(browser) as browser,
+  bool_or(event_name = 'visit') as has_visit,
+  bool_or(event_name = 'visit' and (props->>'is_return')::boolean) as is_return,
+  bool_or(event_name = 'first_play' and coalesce((props->>'mock')::boolean, false) = false) as played,
+  bool_or(event_name = 'room_create' and (props->>'ok')::boolean) as made_room,
+  count(*) filter (where event_name = 'play' and coalesce((props->>'mock')::boolean, false) = false) as plays,
+  count(*) filter (where event_name = 'play' and (props->>'is_again')::boolean) as again_plays,
+  bool_or(event_name = 'replay') as replayed,
+  bool_or(event_name = 'share') as shared,
+  bool_or(event_name = 'login_prompt') as hit_wall,
+  max(stage) filter (where event_name = 'stage_enter') as max_stage,
+  extract(epoch from max(event_time) - min(event_time))::int as dwell_sec
+from public.events
+where app = 'otbbal' and not is_internal
+group by session_id;
+
+create or replace view public.v_otbbal_daily with (security_invoker = true) as
+select
+  day,
+  coalesce(ft_source, source) as source,
+  count(*) as visits,
+  count(*) filter (where is_return) as return_visits,
+  count(*) filter (where played) as h2a_played,
+  count(*) filter (where played or made_room) as h2b_played_or_room,
+  round(100.0 * count(*) filter (where played or made_room) / nullif(count(*), 0), 1) as h2b_pct,
+  count(*) filter (where plays >= 2) as h3_two_plus,
+  round(100.0 * count(*) filter (where plays >= 2) / nullif(count(*) filter (where played), 0), 1) as h3_pct,
+  round(avg(plays) filter (where played), 2) as plays_per_played_session,
+  count(*) filter (where shared) as shared_sessions,
+  count(*) filter (where hit_wall) as login_wall_sessions
+from public.v_otbbal_sessions
+where has_visit
+group by 1, 2
+order by 1 desc, visits desc;
+
+create or replace view public.v_otbbal_funnel with (security_invoker = true) as
+select stage, count(distinct session_id) as sessions
+from public.events
+where app = 'otbbal' and not is_internal and event_name = 'stage_enter'
+group by stage
+order by stage;
+
+create or replace view public.v_otbbal_first_play with (security_invoker = true) as
+select
+  count(*) as first_plays,
+  percentile_cont(0.5) within group (order by (props->>'sec_since_visit')::numeric) as median_sec,
+  round(100.0 * count(*) filter (where (props->>'sec_since_visit')::numeric <= 60) / nullif(count(*), 0), 1) as within_60s_pct
+from public.events
+where app = 'otbbal' and not is_internal and event_name = 'first_play';
+
+revoke all on public.v_otbbal_sessions, public.v_otbbal_daily, public.v_otbbal_funnel, public.v_otbbal_first_play from anon, authenticated;
+grant select on public.v_otbbal_sessions, public.v_otbbal_daily, public.v_otbbal_funnel, public.v_otbbal_first_play to service_role;
+
+-- 7) (추가 2026-11-26) 랭킹 등록: 로그인만으로는 랭킹에 안 뜬다.
+--    랭킹 화면에서 '랭킹 등록' → 닉네임을 정한 사람만 주간 랭킹에 닉네임·최고 점수·승수로 보인다.
+--    등록 전에 한 이번 주 배틀도 등록하면 같이 잡힌다 (배틀 기록 자체는 로그인하면 계속 쌓임).
+alter table public.profiles add column if not exists rank_name text;
+alter table public.profiles add column if not exists ranked_at timestamptz;
+create unique index if not exists profiles_rank_name on public.profiles (lower(rank_name));
+
+create or replace function public.get_weekly_ranking(since timestamptz, max_rows int default 50)
+returns table (rank bigint, user_id uuid, rank_name text, best int, wins int)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with b as (
+    select * from public.battles
+    where not hidden and not is_mock and created_at >= since
+  ),
+  agg as (
+    select
+      b.user_id,
+      max(b.p1_total)::int as best,
+      count(distinct case when b.p1_won then b.p1_hash || ':' || b.p2_hash end)::int as wins
+    from b
+    group by b.user_id
+  )
+  select
+    rank() over (order by a.best desc, a.wins desc) as rank,
+    a.user_id,
+    pr.rank_name,
+    a.best,
+    a.wins
+  from agg a
+  join public.profiles pr on pr.id = a.user_id and pr.rank_name is not null
+  order by a.best desc, a.wins desc, pr.ranked_at asc
+  limit max_rows;
+$$;
+
+revoke all on function public.get_weekly_ranking(timestamptz, int) from public, anon, authenticated;
+grant execute on function public.get_weekly_ranking(timestamptz, int) to service_role;

@@ -35,3 +35,12 @@
 - 조롱 LLM 모듈 `lib/roaster.ts`: 한줄평 스타일·규칙·출력 검사(`guardRoast`)·대체 문장(`fallbackRoast`)을 담당. `lib/scoring.ts`는 여기서 가져다 씀. 다시 뽑기 전용 모델 `ROAST_MODEL`(비우면 SCORE_MODEL).
 - 커뮤니티 조롱 말투 은행 `lib/roast-bank.json` (한줄평 134, 패턴 76). 만드는 과정은 `tools/roast_mining/PIPELINE.md` (제목만 자동 수집 → 거르기 → 하위 에이전트 → 검수 → 합치기). 원문 제목은 `game_research/`(gitignore)에만.
 - 한줄평 스타일 10종 → 13종: 의문형 떠보기 / 다수 동조 압박체 / 사과문체 추가(사용자 승인). 새 스타일은 `lib/roaster.ts` ROAST_STYLES와 `merge_bank.py` STYLES 두 곳을 같이 고친다.
+- 한줄평 스타일 13종 → 25종: 옛날 예능(무도·1박2일) 자막 말투 12종 추가 (제작진 속마음 / 효과음 / 별명 붙이기 / "X의 X자도 모르면서" / ※주의 / 특집 제목 / 구분 박스 등). 로그 `roast_style`은 s14~s25.
+
+## 2026-11-26 랭킹 개편 (주간만 + 랭킹 등록)
+- 랭킹 화면은 **주간 랭킹 한 칸**만 (전체 랭킹·승수 탭 없앰). 모바일 우선 레이아웃. 열: 순위 / 닉네임 / 점수(이번 주 최고) / 승수(이번 주).
+- 로그인만으로는 랭킹에 안 뜸. 랭킹 화면 '🏁 랭킹 등록하기' → 닉네임 설정 화면(2~10자, 한글·영문·숫자·_, 금지어·중복 검사) → 등록한 사람만 표시. 등록 후 '바꾸기'로 닉네임 변경 가능.
+- 배틀 기록은 로그인하면 계속 쌓이고, 등록하면 이번 주 기록이 같이 잡힘.
+- API: `GET /api/ranking`(주간 rows + 내 등록 상태), `POST /api/ranking/register`.
+- **DB 작업 필요:** Supabase SQL Editor에서 `supabase/schema.sql`의 7번(랭킹 등록: profiles.rank_name·ranked_at, get_weekly_ranking)을 실행해야 배포 화면에서 동작. 실행 전엔 랭킹이 비고 "랭킹 DB가 아직 준비 중" 문구가 뜸.
+- 개인정보처리방침·이용약관의 랭킹 문구도 같이 고침.
