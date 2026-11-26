@@ -71,10 +71,7 @@ export default function RankingBoard({ authReady }: { authReady: boolean }) {
               <button type="button" className="linkish" onClick={() => setView("name")}>바꾸기</button>
             </p>
           ) : (
-            <>
-              <button type="button" className="rank-btn rank-register" onClick={startRegister}>🏁 랭킹 등록하기</button>
-              <p className="rank-reg-hint">{me?.loggedIn ? "닉네임만 정하면 이번 주 랭킹에 바로 올라감" : "로그인하고 닉네임 정하면 올라감"}</p>
-            </>
+            <button type="button" className="rank-btn rank-register" onClick={startRegister}>🏁 랭킹 등록하기</button>
           )}
         </div>
       )}

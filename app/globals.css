@@ -581,7 +581,6 @@ body.tension::after {
 .rank-reg { display: flex; flex-direction: column; align-items: center; gap: 22px; padding-top: 4px; }
 .rank-register { border: 0; cursor: pointer; font-size: 18px; min-height: 48px; }
 .rank-reg-hint { margin: 0; font-size: 13px; text-align: center; }
-.rank-reg .rank-reg-hint { background: rgba(255, 255, 255, .85); border: 2px solid var(--ink); padding: 2px 8px; }
 .rank-myname { margin: 0; background: rgba(255, 255, 255, .85); border: 2px solid var(--ink); padding: 4px 10px; display: flex; gap: 8px; align-items: center; }
 .rank-nameform { width: 100%; max-width: 520px; margin: 0 auto; transform: none; }
 .rank-nameform form { display: flex; flex-direction: column; gap: 8px; padding: 12px; }
@@ -661,6 +660,9 @@ body.tension::after {
 .legal-links { text-align: center; font-size: 12px; margin: 18px auto 28px; padding: 0 16px; color: #333; }
 .legal-links a { color: inherit; }
 .legal-consent { font-size: 12px; line-height: 1.5; margin: 8px 0; }
+/* 로그인 창 안내: 작고 흐릿하게 (경고처럼 보이지 않게) */
+.login-fine { font-size: 11px; line-height: 1.5; margin: 6px 0 0; color: #6b6b6b; }
+.login-fine a { color: inherit; text-decoration: underline; }
 .legal-consent a { color: #00f; }
 .legal-switch { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .win98.legal { max-width: 860px; min-width: 0; width: 100%; box-sizing: border-box; margin: 12px auto 0; }
