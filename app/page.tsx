@@ -20,8 +20,6 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
         <span className="sticker s1" aria-hidden="true">✨</span>
         <span className="sticker s2" aria-hidden="true">💅</span>
         <h1 className="wordart">옷빨 배틀</h1>
-        <br />
-        <p className="sub">두 장 찍든 올리든 하고 가운데 START 누르면 채점 들어감</p>
       </header>
       <div className="rank-entry">
         <Link className="rank-btn" href="/ranking">🏆 랭킹 <small>주간</small></Link>
