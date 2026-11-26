@@ -101,13 +101,6 @@ export default function Battle({ loggedIn, inviteCode, room, roomNew }: Props) {
 
       <footer>
         <span className="counter" id="counter">TOTAL BATTLE 000</span>
-        <span className="note">
-          채점할 때만 사진을 AI한테 보내고 버림. 얼굴·몸매는 안 보고 옷만 봄.
-          {" "}도전장(링크 대결)은 양쪽이 결과를 보도록 두 사진을 24시간만 보관하고 지움.
-          {loggedIn
-            ? " 1P가 내 사진으로 랭킹에 올라감 (사진은 저장 안 하고 점수만)."
-            : " 로그인하면 1P 점수가 랭킹에 올라감 (로그인은 만 14세 이상). 14세 미만은 로그인 없이 놀고, 얼굴 안 나오게 옷만 찍어줘."}
-        </span>
       </footer>
 
       {inviting && roomUrl && roomInfo && (
