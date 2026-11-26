@@ -139,28 +139,19 @@ export function judge(s1: Score, s2: Score, h1: string, h2: string) {
 
 /**
  * 로그인한 사람의 배틀 기록 (그 사람 사진이 1P 자리). 같은 사진끼리는 기록 안 함.
- * sharePhoto 면 그 사람 사진만 친구 공개용으로 저장. 상대 사진은 여기서 저장하지 않는다.
+ * 사진 자체는 저장하지 않는다 (점수·승패·지문만).
  */
 export async function recordBattle(
   ctx: Ctx,
   user: User,
-  mine: { img: Buffer; hash: string; score: Score },
+  mine: { hash: string; score: Score },
   other: { hash: string; score: Score },
   won: boolean,
-  sharePhoto: boolean,
 ): Promise<{ recorded: boolean; photoShared: boolean }> {
   const db = ctx.db;
   if (!db || mine.hash === other.hash) return { recorded: false, photoShared: false };
-  let path: string | null = null;
-  if (sharePhoto) {
-    const p = `${user.id}/${mine.hash}.jpg`;
-    const { error } = await db.storage.from("photos").upload(p, mine.img, { contentType: "image/jpeg", upsert: true });
-    if (error) console.error("photo upload", error.message);
-    else path = p;
-  }
   const { error } = await db.from("battles").insert({
     is_mock: ctx.mock,
-    p1_photo_path: path,
     user_id: user.id,
     p1_hash: mine.hash,
     p2_hash: other.hash,
@@ -170,7 +161,7 @@ export async function recordBattle(
     p1_nickname: mine.score.nickname,
   });
   if (error) console.error("battles write", error.message);
-  return { recorded: !error && !ctx.mock, photoShared: !!path };
+  return { recorded: !error && !ctx.mock, photoShared: false };
 }
 
 /** 채점 에러 → HTTP 응답 코드 */

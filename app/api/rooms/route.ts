@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       hostTokenHash: tokenHash(token),
       hostId: user?.id ?? null,
       hostName,
-      hostShare: !!user && form.get("share_photo") === "1",
+      hostShare: false, // 친구 공개용 사진 저장 기능은 없앰
       p1Hash: hash,
       p1Score: score,
       p1Cached: cached,

@@ -30,7 +30,7 @@ function view(room: Room, role: RoomView["role"], loggedIn: boolean, own?: { rec
   if (room.result) {
     // 방장(1P)이 보면: 로그인해서 만든 방이고 가짜 점수가 아니면 랭킹 반영됨
     const hostRec = role === "host" && !!room.hostId && !room.isMock && room.p1Hash !== room.p2Hash;
-    const rec = own ?? { recorded: hostRec, photoShared: hostRec && room.hostShare };
+    const rec = own ?? { recorded: hostRec, photoShared: false };
     result = { ...room.result, ...rec, loggedIn };
   }
   return { status, role, hostName: room.hostName, guestName: room.guestName, expiresAt, result };
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     const { winner, loser } = judge(s1, s2, room.p1Hash, h2);
 
     // 한줄평은 진 쪽 사진을 보고 만든다. 1P가 졌으면 저장해 둔 1P 사진을 꺼낸다
-    const p1 = loser === "p1" || room.hostShare ? await getPhoto(db, code, "p1") : null;
+    const p1 = loser === "p1" ? await getPhoto(db, code, "p1") : null;
     const roast = loser === "p2" || !p1
       ? await pickRoast(ctx, { img: p2, score: s2, fresh: roasts.get(h2) }, s1)
       : await pickRoast(ctx, { img: p1, score: s1 }, s2);
@@ -98,13 +98,10 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     // 기록: 각자 자기 사진이 1P 자리인 배틀로 남긴다 (랭킹·친구 화면)
     const mine = user
-      ? await recordBattle(ctx, user, { img: p2, hash: h2, score: s2 }, { hash: room.p1Hash, score: s1 }, winner === "p2", form.get("share_photo") === "1")
+      ? await recordBattle(ctx, user, { hash: h2, score: s2 }, { hash: room.p1Hash, score: s1 }, winner === "p2")
       : { recorded: false, photoShared: false };
     if (room.hostId && room.hostId !== user?.id) {
-      const hostImg = p1 ?? (await getPhoto(db, code, "p1"));
-      if (hostImg) {
-        await recordBattle(ctx, { id: room.hostId } as User, { img: hostImg, hash: room.p1Hash, score: s1 }, { hash: h2, score: s2 }, winner === "p1", room.hostShare);
-      }
+      await recordBattle(ctx, { id: room.hostId } as User, { hash: room.p1Hash, score: s1 }, { hash: h2, score: s2 }, winner === "p1");
     }
 
     const done = { ...room, guestId: user?.id ?? null, guestName, p2Hash: h2, result, finishedAt: new Date().toISOString() };

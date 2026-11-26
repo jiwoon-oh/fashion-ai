@@ -1,11 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { initBattle, type RoomInfo } from "@/lib/battle-client";
 import type { BattleResult } from "@/lib/rubric";
 import ShareSheet from "./ShareSheet";
-
-const SHARE_PHOTO_KEY = "ootd-share-photo";
 
 // 화면 뼈대는 프로토타입 그대로. 동작은 lib/battle-client.ts 가 붙인다.
 type Props = {
@@ -21,28 +19,16 @@ export default function Battle({ loggedIn, inviteCode, room, roomNew }: Props) {
   const [shareItem, setShareItem] = useState<{ result: BattleResult; photo: Blob | null } | null>(null);
   const [roomInfo, setRoomInfo] = useState<RoomInfo | null>(null);
   const [inviting, setInviting] = useState(false);
-  const [sharePhoto, setSharePhoto] = useState(true);
-  const sharePhotoRef = useRef(true);
   const [origin, setOrigin] = useState("");
 
   useEffect(() => {
     setOrigin(window.location.origin);
-    try {
-      const v = localStorage.getItem(SHARE_PHOTO_KEY);
-      if (v === "0") { setSharePhoto(false); sharePhotoRef.current = false; }
-    } catch { /* 기본값 사용 */ }
   }, []);
-  const toggleShare = (v: boolean) => {
-    setSharePhoto(v);
-    sharePhotoRef.current = v;
-    try { localStorage.setItem(SHARE_PHOTO_KEY, v ? "1" : "0"); } catch { /* 무시 */ }
-  };
 
   useEffect(
     () => initBattle({
       loggedIn,
       room,
-      sharePhoto: () => sharePhotoRef.current,
       onShare: (result, photo) => setShareItem({ result, photo }),
       onRoom: (info) => {
         setRoomInfo(info);
@@ -90,13 +76,6 @@ export default function Battle({ loggedIn, inviteCode, room, roomNew }: Props) {
         ))}
       </main>
 
-      {loggedIn && (
-        <label className="share-toggle">
-          <input type="checkbox" checked={sharePhoto} onChange={(e) => toggleShare(e.target.checked)} />
-          친구한테 내 1P 사진이랑 점수 보여주기 <small>(끄면 점수만 보임 · 2P 사진은 저장 안 함)</small>
-        </label>
-      )}
-
       <div className="status" id="status" aria-live="polite">{room ? "도전장 여는 중…" : "사진 두 장 올리고 START 누르셈"}</div>
 
       <div className="roast" id="roast" hidden aria-live="polite">
@@ -126,8 +105,8 @@ export default function Battle({ loggedIn, inviteCode, room, roomNew }: Props) {
           채점할 때만 사진을 AI한테 보내고 버림. 얼굴·몸매는 안 보고 옷만 봄.
           {" "}도전장(링크 대결)은 양쪽이 결과를 보도록 두 사진을 24시간만 보관하고 지움.
           {loggedIn
-            ? " 1P가 내 사진으로 랭킹에 올라감. 위 체크를 켜면 1P 사진만 친구 공개용으로 저장됨 (친구 탭에서 언제든 삭제)."
-            : " 로그인하면 1P 점수가 랭킹에 올라감."}
+            ? " 1P가 내 사진으로 랭킹에 올라감 (사진은 저장 안 하고 점수만)."
+            : " 로그인하면 1P 점수가 랭킹에 올라감 (로그인은 만 14세 이상). 14세 미만은 로그인 없이 놀고, 얼굴 안 나오게 옷만 찍어줘."}
         </span>
       </footer>
 

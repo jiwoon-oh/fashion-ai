@@ -44,6 +44,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
         </div>
         {children}
+        <nav className="legal-links" aria-label="약관">
+          <a href="/terms">이용약관</a> · <a href="/privacy"><b>개인정보처리방침</b></a> · 로그인은 만 14세 이상
+        </nav>
         <div className="rain" id="rain" aria-hidden="true" />
       </body>
     </html>

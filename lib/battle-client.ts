@@ -63,7 +63,6 @@ type RoomView = { status: "waiting" | "done" | "expired"; role: "host" | "guest"
 
 type InitOpts = {
   loggedIn: boolean;
-  sharePhoto: () => boolean;
   /** 결과 공유: 결과는 "나"가 1P인 모양으로, 사진은 내 사진 */
   onShare: (result: BattleResult, myPhoto: Blob | null) => void;
   /** 링크 대결방 화면이면 방 코드 */
@@ -72,7 +71,7 @@ type InitOpts = {
   onRoom?: (info: RoomInfo) => void;
 };
 
-export function initBattle({ loggedIn, sharePhoto, onShare, room, onRoom }: InitOpts): () => void {
+export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () => void {
   const $ = (id: string) => document.getElementById(id) as HTMLElement;
   const off = new AbortController();
   const on = <K extends keyof HTMLElementEventMap>(el: EventTarget, ev: K | string, fn: (e: Event) => void) =>
@@ -259,7 +258,6 @@ export function initBattle({ loggedIn, sharePhoto, onShare, room, onRoom }: Init
     const fd = new FormData();
     fd.append("p1", S.p1.blob, "p1.jpg");
     fd.append("p2", S.p2.blob, "p2.jpg");
-    if (loggedIn && sharePhoto()) fd.append("share_photo", "1");
     fd.append("recent", JSON.stringify(readRecent()));
     let r: BattleResult;
     try {
@@ -518,7 +516,6 @@ export function initBattle({ loggedIn, sharePhoto, onShare, room, onRoom }: Init
     setStatus("AI가 기준표 들고 째려보는 중", "judging");
     const fd = new FormData();
     fd.append("p2", S.p2.blob, "p2.jpg");
-    if (loggedIn && sharePhoto()) fd.append("share_photo", "1");
     fd.append("recent", JSON.stringify(readRecent()));
     let v: RoomView;
     try {
@@ -552,7 +549,6 @@ export function initBattle({ loggedIn, sharePhoto, onShare, room, onRoom }: Init
     setStatus("내 코디 먼저 채점해 두는 중… (2P는 자기 폰에서 붙음)", "judging");
     const fd = new FormData();
     fd.append("p1", S.p1.blob, "p1.jpg");
-    if (loggedIn && sharePhoto()) fd.append("share_photo", "1");
     try {
       const res = await fetch("/api/rooms", { method: "POST", body: fd });
       const data = await res.json().catch(() => ({}));

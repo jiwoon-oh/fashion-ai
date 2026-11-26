@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { FriendBattle, FriendSummary, FriendsResponse } from "@/lib/friends";
+import type { FriendSummary, FriendsResponse } from "@/lib/friends";
 import ShareSheet from "./ShareSheet";
 
 const INVITE_TEXT = "옷빨 배틀 친구하자 ㅋㅋ 이 링크로 들어와서 로그인하면 서로 코디 점수 볼 수 있음";
@@ -46,12 +46,24 @@ export default function FriendsBoard() {
     load();
   };
 
+  // 예전 버전에서 친구 공개용으로 저장됐던 사진 지우기 (지금은 사진을 저장하지 않음)
   const deletePhotos = async () => {
-    if (!confirm("친구 공개용으로 저장된 내 1P 사진을 전부 지울까? 점수 기록은 남고 사진만 사라짐. 되돌릴 수 없음!")) return;
+    if (!confirm("예전에 친구 공개용으로 저장된 내 사진이 있으면 전부 지울까? 점수 기록은 남음. 되돌릴 수 없음!")) return;
     const r = await fetch("/api/me/photos", { method: "DELETE" });
     const d = await r.json().catch(() => ({}));
     setMsg(r.ok ? `🗑 사진 ${d.removed ?? 0}장 지움` : "지우다 삐끗함 ㅠ 다시 해줘");
     load();
+  };
+
+  const withdraw = async () => {
+    if (!confirm("정말 탈퇴할까? 내 계정, 배틀 기록, 랭킹, 친구 관계, 저장된 사진이 전부 바로 지워짐. 되돌릴 수 없음!")) return;
+    if (!confirm("마지막 확인: 진짜 탈퇴?")) return;
+    const r = await fetch("/api/me", { method: "DELETE" });
+    if (r.ok) {
+      try { ["ootd-ref", "ootd-share-photo"].forEach((k) => localStorage.removeItem(k)); } catch { /* 무시 */ }
+      alert("탈퇴 완료. 그동안 고마웠음 ㅠ");
+      window.location.href = "/";
+    } else setMsg("탈퇴하다 삐끗함 ㅠ 잠시 뒤 다시 하거나 개인정보처리방침의 연락처로 알려줘");
   };
 
   if (failed) return <p className="status small">{failed}</p>;
@@ -67,7 +79,6 @@ export default function FriendsBoard() {
           <p>내 친구 코드: <b className="code">{data.inviteCode || "…"}</b></p>
           <div className="btnrow">
             <button className="btn98" type="button" onClick={() => setSharing(true)} disabled={!inviteUrl}>💌 초대 링크 보내기</button>
-            <button className="btn98" type="button" onClick={deletePhotos}>🗑 내 사진 기록 지우기</button>
           </div>
           <form className="code-form" onSubmit={addFriend}>
             <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="친구 코드나 초대 링크 붙여넣기" aria-label="친구 코드" maxLength={200} />
@@ -77,12 +88,13 @@ export default function FriendsBoard() {
         </div>
       </section>
 
-      <Person p={data.me} />
-      {data.friends.length === 0 ? (
-        <p className="status small">아직 친구 없음 ㅠ 위에서 초대 링크 보내면, 그 링크로 들어온 친구가 로그인할 때 자동으로 친구 됨</p>
-      ) : (
-        data.friends.map((f, i) => <Person key={f.id} p={f} rank={i + 1} onRemove={() => removeFriend(f)} />)
-      )}
+      <FriendList me={data.me} friends={data.friends} onRemove={removeFriend} />
+
+      <p className="withdraw">
+        <a href="/privacy">개인정보처리방침</a> · <a href="/terms">이용약관</a> ·{" "}
+        <button type="button" className="linkish plain" onClick={deletePhotos}>예전 저장 사진 지우기</button> ·{" "}
+        <button type="button" className="linkish" onClick={withdraw}>회원 탈퇴</button>
+      </p>
 
       {sharing && (
         <ShareSheet
@@ -98,49 +110,34 @@ export default function FriendsBoard() {
   );
 }
 
-function Person({ p, rank, onRemove }: { p: FriendSummary; rank?: number; onRemove?: () => void }) {
+// 친구 순위: 한 줄에 한 명 (나 포함, 최고 점수 순)
+function FriendList({ me, friends, onRemove }: { me: FriendSummary; friends: FriendSummary[]; onRemove: (f: FriendSummary) => void }) {
+  const rows = [me, ...friends].sort((a, b) => (b.best?.total ?? -1) - (a.best?.total ?? -1) || b.wins - a.wins);
   return (
-    <section className={`win98 person ${p.me ? "p1" : "p2"}`} aria-label={p.name}>
-      <div className="titlebar">
-        <span className="name">{rank ? `${rank}. ` : ""}{p.name}{p.me ? " (나)" : ""}</span>
-        {onRemove && (
-          <span className="tb-btns">
-            <button type="button" onClick={onRemove} aria-label={`${p.name} 친구 끊기`} title="친구 끊기"><i>x</i></button>
-          </span>
-        )}
-      </div>
+    <section className="win98 friend-list" aria-label="친구 순위">
+      <div className="titlebar"><span className="name">친구순위.exe ({friends.length}명)</span><span className="tb-btns" aria-hidden="true"><i>_</i><i>□</i><i>x</i></span></div>
       <div className="winbody">
-        <div className="person-stats">
-          <span>🏆 최고 <b>{p.best ? `${p.best.total}점` : "-"}</b>{p.best?.mock ? <small> (가짜)</small> : null}</span>
-          <span>⚔️ <b>{p.wins}승</b></span>
-          <span>🎮 {p.battles}판</span>
-        </div>
-        {p.recent.length === 0 ? (
-          <p className="rank-empty">아직 배틀 기록 없음</p>
-        ) : (
-          <ul className="photo-grid">
-            {p.recent.map((b, i) => <Shot key={i} b={b} />)}
-          </ul>
+        {friends.length === 0 && (
+          <p className="rank-empty">아직 친구 없음 ㅠ 위에서 초대 링크 보내면, 그 링크로 들어온 친구가 로그인할 때 자동으로 친구 됨</p>
         )}
+        <ol className="flist">
+          {rows.map((p, i) => (
+            <li key={p.id} className={p.me ? "me" : ""}>
+              <span className="fl-rank">{i + 1}</span>
+              <span className="fl-name">{p.name}{p.me ? " (나)" : ""}</span>
+              <span className="fl-best" title={p.best?.nickname ? `최고 점수 코디: ${p.best.nickname}` : undefined}>
+                {p.best ? <>{p.best.total}<small>점</small>{p.best.mock ? <small className="fl-mock">가짜</small> : null}</> : "-"}
+              </span>
+              <span className="fl-wins">{p.wins}<small>승</small></span>
+              <span className="fl-games">{p.battles}<small>판</small></span>
+              {p.me ? <span className="fl-x" /> : (
+                <button type="button" className="fl-x" onClick={() => onRemove(p)} aria-label={`${p.name} 친구 끊기`} title="친구 끊기">✕</button>
+              )}
+            </li>
+          ))}
+        </ol>
+        <p className="share-hint">점수·승수만 보임. 어떤 사진으로 몇 점 받았는지는 안 보여줌. 전체 사용자 순위는 🏆 랭킹에서.</p>
       </div>
     </section>
-  );
-}
-
-function Shot({ b }: { b: FriendBattle }) {
-  return (
-    <li className={b.won ? "won" : "lost"}>
-      <div className="shot">
-        {b.photoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={b.photoUrl} alt={b.nickname ? `${b.nickname} 코디` : "코디 사진"} loading="lazy" />
-        ) : (
-          <span className="no-photo">사진 비공개</span>
-        )}
-        <span className="shot-score">{b.total}<small>점</small></span>
-        <span className="shot-tag">{b.won ? "WIN" : "패배"}</span>
-      </div>
-      <p className="shot-nick">{b.nickname || "별명 없음"}{b.mock ? " · 가짜점수" : ""}</p>
-    </li>
   );
 }

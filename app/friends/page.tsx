@@ -17,7 +17,7 @@ export default async function FriendsPage() {
       <header>
         <h1 className="wordart">친구들 옷빨</h1>
         <br />
-        <p className="sub">내 친구들이 어떤 코디로 몇 점 받았는지 구경하셈</p>
+        <p className="sub">친구들 최고 점수랑 승수 순위. 전체 순위는 🏆 랭킹에서</p>
       </header>
       {user ? (
         <FriendsBoard />

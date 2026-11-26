@@ -615,3 +615,47 @@ body.tension::after {
 .photo-grid li.lost .shot-tag { background: var(--paper); color: var(--red); border-color: var(--red); }
 .shot-nick { margin: 3px 0 0; font-size: 12px; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 520px) { .photo-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; } }
+
+/* ---------- 약관·개인정보처리방침 ---------- */
+.legal-links { text-align: center; font-size: 12px; margin: 18px auto 28px; padding: 0 16px; color: #333; }
+.legal-links a { color: inherit; }
+.legal-consent { font-size: 12px; line-height: 1.5; margin: 8px 0; }
+.legal-consent a { color: #00f; }
+.legal-switch { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.win98.legal { max-width: 860px; min-width: 0; width: 100%; box-sizing: border-box; margin: 12px auto 0; }
+.win98.legal .winbody { min-width: 0; }
+.legal-table { max-width: 100%; }
+.legal-table td, .legal-table th { word-break: keep-all; }
+.win98.legal .winbody { background: #fff; padding: 18px 20px 26px; font-family: system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; font-size: 15px; line-height: 1.7; color: #111; overflow-wrap: anywhere; }
+.win98.legal h1 { font-family: "Black Han Sans", sans-serif; font-weight: 400; font-size: 28px; margin: 0 0 4px; }
+.win98.legal h2 { font-size: 17px; margin: 26px 0 8px; padding-bottom: 4px; border-bottom: 2px dotted #c0c0c0; }
+.win98.legal ol, .win98.legal ul { padding-left: 22px; margin: 6px 0; }
+.win98.legal li { margin: 3px 0; }
+.win98.legal a { color: #00e; }
+.legal-date { color: #666; font-size: 13px; margin: 0 0 14px; }
+.legal-summary { background: #ffffe1; border: 1px solid #000; padding: 10px 12px 10px 30px !important; }
+.legal-note { font-size: 13px; color: #444; background: #f4f4f4; padding: 8px 10px; }
+.legal-table { overflow-x: auto; margin: 8px 0; -webkit-overflow-scrolling: touch; }
+.legal-table table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 13px; line-height: 1.5; }
+.legal-table th, .legal-table td { border: 1px solid #999; padding: 6px 8px; vertical-align: top; text-align: left; }
+.legal-table th { background: #000080; color: #fff; font-weight: 700; white-space: nowrap; }
+.withdraw { text-align: center; font-size: 12px; margin: 24px 0 0; color: #333; }
+.withdraw a { color: inherit; }
+.linkish { background: none; border: 0; padding: 0; font: inherit; color: #b00; text-decoration: underline; cursor: pointer; }
+
+/* ---------- 친구 순위 (한 줄 요약) ---------- */
+.friend-list .winbody { padding: 8px; }
+.flist { list-style: none; margin: 0; padding: 0; }
+.flist li { display: grid; grid-template-columns: 26px minmax(0, 1fr) 58px 42px 42px 26px; align-items: center; gap: 4px; padding: 7px 6px; border-bottom: 1px dotted #999; font-size: 15px; }
+.flist li:last-child { border-bottom: 0; }
+.flist li.me { background: #ffffe1; font-weight: 700; }
+.flist small { font-size: 0.72em; margin-left: 1px; }
+.fl-rank { font-family: "Press Start 2P", monospace; font-size: 11px; text-align: center; }
+.flist li:nth-child(1) .fl-rank { color: #d4a000; }
+.fl-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fl-best { font-family: "Black Han Sans", sans-serif; font-size: 18px; text-align: right; color: #c0006a; }
+.fl-mock { display: block; font-family: system-ui, sans-serif; font-size: 10px !important; color: #888; margin: 0 !important; }
+.fl-wins, .fl-games { text-align: right; font-size: 14px; }
+.fl-x { border: 0; background: none; color: #999; cursor: pointer; font-size: 13px; padding: 2px; }
+.fl-x:hover { color: #c00; }
+.linkish.plain { color: inherit; }

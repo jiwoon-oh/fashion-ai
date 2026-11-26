@@ -42,9 +42,9 @@ export async function POST(request: NextRequest) {
       winner === "p1" ? s1 : s2,
     );
 
-    // 로그인했으면 기록 → 랭킹·친구 화면 반영. 친구 공개를 켰으면 1P 사진(내 사진)만 저장
+    // 로그인했으면 기록 → 랭킹·친구 화면 반영 (사진은 저장 안 함)
     const rec = user
-      ? await recordBattle(ctx, user, { img: p1, hash: hash.p1, score: s1 }, { hash: hash.p2, score: s2 }, winner === "p1", form.get("share_photo") === "1")
+      ? await recordBattle(ctx, user, { hash: hash.p1, score: s1 }, { hash: hash.p2, score: s2 }, winner === "p1")
       : { recorded: false, photoShared: false };
 
     const body: BattleResult = {
