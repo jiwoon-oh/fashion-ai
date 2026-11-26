@@ -328,6 +328,25 @@ input.file-overlay:disabled { pointer-events: none; }
   animation: pop .4s cubic-bezier(.2, 1.6, .4, 1) both .35s;
 }
 .roast[hidden] { display: none !important; }
+
+/* 점수 올리는 법 (기준표) */
+.tips { transform: rotate(-0.4deg); animation: pop .4s cubic-bezier(.2, 1.6, .4, 1) both .6s; }
+.tips[hidden] { display: none !important; }
+.tips .titlebar { background: linear-gradient(90deg, #006400, #2fb52f); }
+.tips-x {
+  width: 18px; height: 16px; padding: 0;
+  background: var(--gray98); color: var(--ink);
+  border: 1px solid; border-color: var(--paper) var(--ink) var(--ink) var(--paper);
+  font: 700 10px/12px var(--pixel); cursor: pointer;
+}
+.tips .winbody { background: var(--paper); border: 2px solid; border-color: var(--gray98-dark) var(--paper) var(--paper) var(--gray98-dark); font-size: 15px; }
+.tips-lead { margin: 0; font-family: var(--display); font-size: 17px; }
+.tips-list { margin: 0; padding-left: 1.4em; display: grid; gap: 6px; line-height: 1.4; }
+.tips-list li.weak { background: var(--yellow); outline: 2px solid var(--ink); padding: 2px 4px; }
+.tips-list b { white-space: nowrap; }
+.tips-more summary { cursor: pointer; color: var(--blue98); text-decoration: underline; }
+.tips-rubric { margin-top: 8px; font-size: 13px; }
+.tips-rubric ul { margin: 4px 0 0; padding-left: 1.2em; }
 .roast::before {
   content: "";
   position: absolute;

@@ -68,14 +68,13 @@ export async function getScores(
   const hashes = [...new Set(photos.map((p) => p.hash))];
 
   if (scoreDb) {
-    const { data, error } = await scoreDb
-      .from("photo_scores")
-      .select("hash,color,fit,harmony,trend,total,nickname,praise")
-      .eq("rubric_version", RUBRIC_VERSION)
-      .in("hash", hashes);
+    // mood 칸은 2026-11-26에 추가. 아직 SQL 을 안 돌린 DB 면 mood 없이 다시 읽는다
+    const read = (cols: string) => scoreDb.from("photo_scores").select(cols).eq("rubric_version", RUBRIC_VERSION).in("hash", hashes);
+    let { data, error } = await read("hash,color,fit,harmony,trend,total,nickname,praise,mood");
+    if (error && /mood/.test(error.message)) ({ data, error } = await read("hash,color,fit,harmony,trend,total,nickname,praise"));
     if (error) console.error("photo_scores read", error.message);
-    for (const row of data ?? []) {
-      scores.set(row.hash, { color: row.color, fit: row.fit, harmony: row.harmony, trend: row.trend, total: row.total, nickname: row.nickname, praise: row.praise });
+    for (const row of (data ?? []) as unknown as (Score & { hash: string; mood?: string | null })[]) {
+      scores.set(row.hash, { color: row.color, fit: row.fit, harmony: row.harmony, trend: row.trend, total: row.total, nickname: row.nickname, praise: row.praise, mood: row.mood ?? undefined });
     }
   } else {
     for (const h of hashes) {
@@ -101,10 +100,14 @@ export async function getScores(
       scores.set(h, score);
       roasts.set(h, { roast, style });
       if (scoreDb) {
-        const { error } = await scoreDb.from("photo_scores").upsert(
-          { hash: h, rubric_version: RUBRIC_VERSION, ...score, scored_by: ctx.user?.id ?? null, scored_ip: ctx.ipHash },
-          { onConflict: "hash,rubric_version", ignoreDuplicates: true },
-        );
+        const row: Record<string, unknown> = { hash: h, rubric_version: RUBRIC_VERSION, ...score, scored_by: ctx.user?.id ?? null, scored_ip: ctx.ipHash };
+        const write = (r: Record<string, unknown>) =>
+          scoreDb.from("photo_scores").upsert(r, { onConflict: "hash,rubric_version", ignoreDuplicates: true });
+        let { error } = await write(row);
+        if (error && /mood/.test(error.message)) {
+          delete row.mood; // mood 칸이 아직 없는 DB
+          ({ error } = await write(row));
+        }
         if (error) console.error("photo_scores write", error.message);
       } else {
         memScores.set(h, score);
@@ -134,6 +137,38 @@ export async function pickRoast(
     /* 아래 은행 문장 */
   }
   return { roast: fallbackRoast(ctx.recent), style: "bank" };
+}
+
+/**
+ * 무드가 같은 두 코디는 점수 차를 3~5점으로 좁힌다 ("아깝게 짐"). 승패는 그대로.
+ * 원래 차이가 5점 이하면 손대지 않는다. 같은 두 사진은 언제나 같은 결과가 나오게 사진 지문으로 3·4·5 중 하나를 고른다.
+ * 사진별 저장 점수(photo_scores)는 그대로 두고, 이 배틀에 보여 주는 점수만 바꾼다.
+ */
+export function narrowGap(s1: Score, s2: Score, h1: string, h2: string): { s1: Score; s2: Score; rawDiff: number | null } {
+  const raw = Math.abs(s1.total - s2.total);
+  if (!s1.mood || s1.mood !== s2.mood || s1.mood === "기타" || raw <= 5 || h1 === h2) return { s1, s2, rawDiff: null };
+  const gap = 3 + (parseInt(sha([h1, h2].sort().join(":")).slice(0, 8), 16) % 3);
+  const p1Wins = s1.total > s2.total;
+  const [hi, lo] = p1Wins ? [s1, s2] : [s2, s1];
+  const top = Math.min(100, Math.round((hi.total + lo.total + gap) / 2));
+  const nHi = shiftTo(hi, top), nLo = shiftTo(lo, top - gap);
+  return p1Wins ? { s1: nHi, s2: nLo, rawDiff: raw } : { s1: nLo, s2: nHi, rawDiff: raw };
+}
+
+/** 항목 점수를 1점씩 옮겨 총점을 target 으로 맞춘다 (올릴 땐 낮은 항목부터, 내릴 땐 높은 항목부터) */
+function shiftTo(s: Score, target: number): Score {
+  const keys = ["color", "fit", "harmony", "trend"] as const;
+  const v = { color: s.color, fit: s.fit, harmony: s.harmony, trend: s.trend };
+  let total = keys.reduce((n, k) => n + v[k], 0);
+  target = Math.max(0, Math.min(100, target));
+  while (total !== target) {
+    const up = total < target;
+    const k = [...keys].filter((x) => (up ? v[x] < 25 : v[x] > 0)).sort((a, b) => (up ? v[a] - v[b] : v[b] - v[a]))[0];
+    if (!k) break;
+    v[k] += up ? 1 : -1;
+    total += up ? 1 : -1;
+  }
+  return { ...s, ...v, total };
 }
 
 export function judge(s1: Score, s2: Score, h1: string, h2: string) {

@@ -37,7 +37,9 @@
 | ① 사진 올리기 | 1P / 2P 코디 사진 업로드 (찍기 · 앨범 · 사진 칸 탭 · 드래그 · 붙여넣기) |
 | ② 배틀 시작 | START → AI가 색감 · 핏 · 조화 · 센스 각 25점, 100점 만점 채점 |
 | ③ 결과 | 승자 발표 · 진 쪽 조롱 한줄평 · 이긴 쪽 칭찬 + 코디 별명 |
-| ④ 공유 · 다시 | 결과 공유 · 한줄평 복사 · AGAIN · 새 판 |
+| ④ 공유 · 다시 | 📏 점수 올리는 법(기준표, 결과 뜨면 자동으로 열림 · 닫기 가능) · 결과 공유 · 한줄평 복사 · AGAIN · 새 판 |
+
+> 💡 **접전 보정 (11/26)**: AI가 코디 무드(미니멀 · 캐주얼 · 스트릿 · 포멀 · 스포티 · 빈티지 · 러블리 · 기타)도 같이 고른다. 두 코디 무드가 같고 점수 차가 5점보다 크면, 승패는 그대로 두고 점수 차를 **3~5점으로 좁혀** 보여 준다 (같은 두 사진은 늘 같은 결과). 원래 차이는 `play.raw_diff`에 남는다.
 
 **기획 문서에 없던 기능 (로그에 꼭 반영)**
 
@@ -174,13 +176,14 @@
 | ① | `photo_upload` | 사진 처리가 끝났을 때 (성공 · 실패 모두) | `side`(p1 / p2), `method`(camera / album / slot_tap / drop / paste), `ok`, `fail`(not_image / decode), `replace`(이미 사진 있던 칸인지), `sec_since_visit`, `mode` | 사진 올리기가 **고장 났나**, 카메라 · 앨범 중 뭘 쓰나, 고르다 바꾸나 |
 | ② | `battle_start` | START / AGAIN 클릭 | `mode`, `is_again`, `sec_since_ready`(사진 다 올리고 몇 초 뒤) | 사진 올리고 **시작까지 가나** |
 | ② | `score_done` | 채점 응답 받았을 때 | `ok`, `wait_ms`(AI 기다린 시간), `error`(daily_limit / login_required / rate_limited / refused / upstream / network), `mock` | **기다리다 지치나, 오류 나나** |
-| ③ | `play` | 점수 공개 연출이 끝났을 때 | `nth`, `mode`, `is_again`, `p1_total`, `p2_total`, `diff`(점수 차), `winner`, `tie`, `me_won`(게스트는 2P 기준), `scores`(4항목 × 2), `roast_style`, `mock` | 몇 판 하나, **아깝게 진 사람이 다시 하나** |
+| ③ | `play` | 점수 공개 연출이 끝났을 때 | `nth`, `mode`, `is_again`, `p1_total`, `p2_total`, `diff`(점수 차), `winner`, `tie`, `me_won`(게스트는 2P 기준), `scores`(4항목 × 2), `roast_style`, `mock`, `same_mood`(두 코디 무드가 같은지), `narrowed`(점수 차를 좁혔는지), `raw_diff`(좁히기 전 원래 점수 차) | 몇 판 하나, **아깝게 진 사람이 다시 하나**, 접전으로 만든 판이 다시 하기로 이어지나 |
 | ④ | `share_open` | 공유창 열림 | `context`(result = 결과 / challenge = 도전장 / invite = 친구 초대), `me_won`, `roast_style`, `mode` | 공유창까지 가나 |
 | ④ | `share` | 공유창 채널 버튼 또는 📋 한줄평 복사 | `channel`(kakao / insta_preview / insta_send / insta_save / threads / x / facebook / copy_link / native / copy_roast), `context`, `roast_style`, `me_won` | **어느 앱으로 퍼뜨리나, 어떤 한줄평이 웃겨서 퍼지나, 이긴 쪽 · 진 쪽 누가 공유하나** |
 | ④ | `replay` | 버튼 클릭 | `button`(again = 같은 사진 다시 / new_round = 🗑 새 판 / room_home = 도전장 화면에서 새 판), `after_result` | AGAIN 많음 = **한줄평 뽑기가 재밌다** / 새 판 많음 = **대결 자체가 재밌다** |
 | 도전장 | `room_create` | 도전장 생성 응답 받았을 때 | `ok`, `wait_ms`, `error` | 혼자 온 사람이 도전장이라도 쓰나 |
 | 도전장 | `room_open` | `/r/<코드>` 열었을 때 | `role`(host / guest / viewer), `status`(waiting / done / expired / not_found) | **받은 링크를 친구가 진짜 여나**, 만료로 못 하나 |
 | 도전장 | `room_result` | 도전장 만든 사람 화면에 결과가 뜸 | `min_since_create`(만들고 몇 분 뒤) | 도전장이 실제 배틀로 이어지나, 얼마나 걸리나 |
+| ③ | `score_guide` | 📏 점수 올리는 법 창: 결과가 뜨면 자동으로 열림 / 닫기 / 다시 열기 / 전체 기준표 펼치기 | `action`(show / close / reopen / expand), `side`, `lost`(진 쪽인지), `total`, `weakest`(제일 낮은 항목), `sec_open`(닫기 전 몇 초 봤나), `mode` | 기준표를 읽나, 바로 닫나, 읽고 나서 AGAIN · 새 판으로 이어지나 |
 | 벽 | `login_prompt` | "로그인해야 더 할 수 있음" 안내가 떴을 때 | `context`, `plays_today` | **3판 제한 벽에서 나가나** |
 | 그 외 | `login` | 로그인 완료 | `provider`, `from`(prompt = 벽 보고 / topbar = 스스로) | 로그인을 하나, 벽 때문에 하나 |
 | 그 외 | `ranking_view` | 랭킹 화면 열었을 때 | `tab`(weekly), `my_rank`, `failed` | 랭킹을 보긴 하나 |
@@ -208,6 +211,8 @@
 | 오류 · 벽 | 고장 · 제한 때문에 나가나 | `score_done.ok=false` 비율, `login_prompt` 뒤 이탈 | 2차 근거 | **1차 배포 직후 제일 먼저 확인** |
 | 앱 안 업로드 실패 | 인스타 앱에서 사진이 안 올라가나 | `photo_upload.ok=false`를 browser별로 | 2차 근거 | 여기서 막히면 홍보 효과가 통째로 날아감 |
 | 재방문율 | 다시 오나 | `visit_n ≥ 2`인 사람 ÷ 전체 사람 | 2차 근거 | 앱 안 브라우저 중복 때문에 참고만 |
+| 기준표 효과 | 점수 올리는 법을 본 사람이 또 하나 | `score_guide` 의 `close.sec_open` 중앙값, `reopen` · `expand` 비율, 기준표를 본 방문 vs 바로 닫은 방문의 2판 이상 비율 | 2차 근거 | |
+| 접전 효과 | 아깝게 진 판이 다시 하기로 이어지나 | `play.narrowed=true` 판 뒤 `replay` 비율 vs 아닌 판 | 2차 근거 | |
 | 랭킹 동기 | 경쟁하고 싶어 하나 | `ranking_register` 성공 수, 랭킹 본 사람의 재방문 | 2차 근거 | |
 
 > 🧑‍🏫 **멘토 조언으로 검토**
@@ -396,6 +401,8 @@ group by 1;
 | `lib/battle-client.ts` | 배틀 · 도전장 이벤트 (photo_upload ~ play, room_*, replay, copy_roast, setting_change) |
 | `components/ShareSheet.tsx` | share_open · share (채널별 링크에 `via=` 자동 부착) |
 | `components/TopBar.tsx` | 로그인 버튼 → 돌아왔을 때 login 이벤트 |
+| `lib/battle-client.ts` `showTips` · `components/Battle.tsx` | score_guide (점수 올리는 법 창) |
+| `lib/battle-core.ts` `narrowGap` | 같은 무드면 점수 차 3~5점으로 좁힘 → `rawDiff` |
 | `components/RankingBoard.tsx` · `FriendsBoard.tsx` | ranking_view · ranking_register · friends_view |
 | `lib/scoring.ts` · `battle-core.ts` | 한줄평 스타일 번호(s1~s25 / bank / mock)를 결과에 실어 보냄 |
 | `supabase/schema.sql` 6번 | `events` 표 + 지표 뷰 4개 |
@@ -433,7 +440,7 @@ delete from public.events where event_time < now() - interval '6 months';
 
 ### 9-1. 배포 전 할 일
 
-- [ ] Supabase SQL Editor에서 `supabase/schema.sql`의 **6) 행동 로그** 부분 실행 (표 + 지표 뷰) ← **실행 전까지는 기록되지 않음**
+- [ ] Supabase SQL Editor에서 `supabase/schema.sql`의 **6) 행동 로그** 부분 실행 (표 + 지표 뷰) + `photo_scores`에 `mood` 칸 추가하는 `alter table` 한 줄 ← **실행 전까지는 기록되지 않음**
 - [ ] 팀원 폰마다 `…/?internal=1`로 한 번 접속
 - [ ] 홍보 게시물 링크를 6-6 표로 만들기
 - [ ] 수집 기간(6-1) · 판단 기준 숫자(6-2) 팀 확정
@@ -450,6 +457,8 @@ delete from public.events where event_time < now() - interval '6 months';
 - [ ] 비로그인으로 새 사진 배틀 4판째(새 사진 7장째)에서 `login_prompt`가 찍힘
 - [ ] 15분 넘게 가만히 있다가 다시 누르면 새 `session_id` + `visit`
 - [ ] 랭킹 닉네임 등록하면 `ranking_register` 찍힘
+- [x] 결과가 뜨면 점수 올리는 법 창이 열리고 `score_guide show` → 닫기 `close`(sec_open) → 📏 버튼 `reopen` → 기준표 펼치기 `expand` (개발 서버 확인)
+- [x] 같은 무드 두 장: 원래 9점 차 → 5점 차로 좁혀지고 `play.narrowed=true, raw_diff=9` (가짜 점수 모드 확인)
 - [ ] 같은 사건을 두 번 보내도 한 줄만 저장됨
 - [ ] `?internal=1`로 들어간 폰은 이후 계속 `is_internal=true`
 - [ ] 로그에 사진 · 사진 지문 · IP · 닉네임 · 한줄평 원문이 없음

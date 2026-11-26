@@ -17,6 +17,7 @@ export const OTBBAL_EVENTS = [
   "ranking_register",
   "friends_view",
   "setting_change",
+  "score_guide",
 ] as const;
 
 export type EventName = (typeof COMMON_EVENTS)[number] | (typeof OTBBAL_EVENTS)[number];

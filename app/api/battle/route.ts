@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { BattleResult } from "@/lib/rubric";
 import { isMock, scoringMode } from "@/lib/scoring";
 import { cleanRecent } from "@/lib/roaster";
-import { errorStatus, getScores, ipHashOf, judge, photoHash, pickRoast, readJpeg, recordBattle, type Ctx } from "@/lib/battle-core";
+import { errorStatus, getScores, ipHashOf, judge, narrowGap, photoHash, pickRoast, readJpeg, recordBattle, type Ctx } from "@/lib/battle-core";
 import { adminClient, currentUser } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -34,7 +34,8 @@ export async function POST(request: NextRequest) {
 
   try {
     const { scores, fresh, roasts } = await getScores([{ img: p1, hash: hash.p1 }, { img: p2, hash: hash.p2 }], ctx);
-    const s1 = scores.get(hash.p1)!, s2 = scores.get(hash.p2)!;
+    // 무드가 같으면 점수 차를 3~5점으로 좁힌다 (보여 주는 점수 · 기록 둘 다 이 값)
+    const { s1, s2, rawDiff } = narrowGap(scores.get(hash.p1)!, scores.get(hash.p2)!, hash.p1, hash.p2);
     const { winner, loser } = judge(s1, s2, hash.p1, hash.p2);
     const { roast, style: roastStyle } = await pickRoast(
       ctx,
@@ -54,6 +55,7 @@ export async function POST(request: NextRequest) {
       loser,
       roast,
       roastStyle,
+      ...(rawDiff !== null ? { rawDiff } : {}),
       cachedSides: { p1: !fresh.has(hash.p1), p2: !fresh.has(hash.p2) || hash.p1 === hash.p2 },
       ...rec,
       mock: ctx.mock,

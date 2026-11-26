@@ -54,6 +54,7 @@ create table if not exists public.photo_scores (
   created_at timestamptz not null default now(),
   primary key (hash, rubric_version)
 );
+alter table public.photo_scores add column if not exists mood text; -- 코디 무드 (2026-11-26). 같으면 배틀 점수 차를 3~5점으로 좁힘
 create index if not exists photo_scores_by_user on public.photo_scores (scored_by, created_at);
 create index if not exists photo_scores_by_ip on public.photo_scores (scored_ip, created_at);
 

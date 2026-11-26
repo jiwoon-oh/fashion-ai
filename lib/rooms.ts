@@ -12,7 +12,7 @@ export const ROOM_TTL_H = 24;
 const TTL_MS = ROOM_TTL_H * 3600_000;
 const ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"; // 헷갈리는 글자(i l o 0 1) 뺌
 
-export type RoomResult = Pick<BattleResult, "p1" | "p2" | "winner" | "loser" | "roast" | "roastStyle" | "cachedSides" | "mock">;
+export type RoomResult = Pick<BattleResult, "p1" | "p2" | "winner" | "loser" | "roast" | "roastStyle" | "rawDiff" | "cachedSides" | "mock">;
 
 export type Room = {
   code: string;

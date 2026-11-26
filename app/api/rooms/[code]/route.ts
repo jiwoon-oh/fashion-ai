@@ -3,7 +3,7 @@ import type { User } from "@supabase/supabase-js";
 import type { BattleResult } from "@/lib/rubric";
 import { isMock } from "@/lib/scoring";
 import { cleanRecent } from "@/lib/roaster";
-import { errorStatus, getScores, ipHashOf, judge, photoHash, pickRoast, readJpeg, recordBattle, type Ctx } from "@/lib/battle-core";
+import { errorStatus, getScores, ipHashOf, judge, narrowGap, photoHash, pickRoast, readJpeg, recordBattle, type Ctx } from "@/lib/battle-core";
 import { finishRoom, getPhoto, getRoom, isExpired, isHost, ROOM_TTL_H, type Room } from "@/lib/rooms";
 import { ensureProfile, nameFromMeta } from "@/lib/friends";
 import { adminClient, currentUser } from "@/lib/supabase/server";
@@ -73,7 +73,8 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   try {
     const { scores, fresh, roasts } = await getScores([{ img: p2, hash: h2 }], ctx);
-    const s1 = room.p1Score, s2 = scores.get(h2)!;
+    // 무드가 같으면 점수 차를 3~5점으로 좁힌다
+    const { s1, s2, rawDiff } = narrowGap(room.p1Score, scores.get(h2)!, room.p1Hash, h2);
     const { winner, loser } = judge(s1, s2, room.p1Hash, h2);
 
     // 한줄평은 진 쪽 사진을 보고 만든다. 1P가 졌으면 저장해 둔 1P 사진을 꺼낸다
@@ -90,6 +91,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     const result = {
       p1: s1, p2: s2, winner, loser, roast, roastStyle,
+      ...(rawDiff !== null ? { rawDiff } : {}),
       cachedSides: { p1: room.p1Cached, p2: !fresh.has(h2) || h2 === room.p1Hash },
       mock: ctx.mock,
     };

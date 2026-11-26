@@ -34,6 +34,9 @@ export const RUBRIC: { key: RubricKey; label: string; name: string; anchors: [nu
   ] },
 ];
 
+// 코디 무드 (분위기 종류). 두 사진 무드가 같으면 점수 차를 3~5점으로 좁혀 "아깝게" 지게 한다 (battle-core narrowGap)
+export const MOODS = ["미니멀", "캐주얼", "스트릿", "포멀", "스포티", "빈티지", "러블리", "기타"] as const;
+
 export type Score = {
   color: number;
   fit: number;
@@ -42,6 +45,8 @@ export type Score = {
   total: number;
   nickname: string;
   praise: string;
+  /** 예전에 채점한 사진에는 없음 */
+  mood?: string;
 };
 
 export type BattleResult = {
@@ -52,6 +57,8 @@ export type BattleResult = {
   roast: string;
   /** 한줄평 스타일 번호 (로그용). 예전 도전장 결과에는 없음 */
   roastStyle?: string;
+  /** 무드가 같아서 점수 차를 좁혔으면 원래 점수 차 (로그용) */
+  rawDiff?: number;
   cachedSides: { p1: boolean; p2: boolean };
   recorded: boolean; // 랭킹에 반영됨 (가짜 점수 판은 false)
   photoShared: boolean; // 1P 사진이 친구 공개용으로 저장됨

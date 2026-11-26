@@ -84,6 +84,15 @@ export default function Battle({ loggedIn, inviteCode, room, roomNew }: Props) {
         <p className="praise" id="praise" />
       </div>
 
+      {/* 점수 올리는 법: 결과가 뜨면 바로 보이고, x 로 닫으면 아래 📏 버튼으로 다시 열 수 있음 (lib/battle-client.ts showTips) */}
+      <section className="win98 tips" id="tips" hidden aria-label="점수 올리는 법">
+        <div className="titlebar">
+          <span className="name">점수올리는법.exe</span>
+          <button type="button" className="tips-x" id="tips-close" aria-label="점수 올리는 법 닫기">x</button>
+        </div>
+        <div className="winbody" id="tips-body" />
+      </section>
+
       <div className="controls">
         {!room && (
           <button className="bigbtn pink" type="button" id="btn-challenge" title="1P 칸에 내 코디 올리고 누르면, 친구가 자기 폰에서 2P로 붙을 수 있는 링크가 만들어짐">
@@ -95,6 +104,7 @@ export default function Battle({ loggedIn, inviteCode, room, roomNew }: Props) {
         )}
         <button className="bigbtn pink" type="button" id="btn-share" hidden>📤 결과 공유</button>
         <button className="bigbtn plain" type="button" id="btn-copy" hidden>📋 한줄평 복사</button>
+        <button className="bigbtn plain" type="button" id="btn-tips" hidden>📏 점수 올리는 법</button>
         <button className="bigbtn plain" type="button" id="btn-reset">{room ? "🏠 새 판 하러 가기" : "🗑 새 판"}</button>
         <button className="bigbtn plain" type="button" id="btn-sound" aria-pressed="true">🔊 소리 ON</button>
       </div>

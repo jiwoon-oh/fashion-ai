@@ -103,6 +103,7 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
       winner: r.winner, tie: r.p1.total === r.p2.total, me_won: r.winner === me,
       scores: { p1: sc("p1"), p2: sc("p2") },
       roast_style: r.roastStyle ?? null, mock: r.mock,
+      same_mood: !!r.p1.mood && r.p1.mood === r.p2.mood, narrowed: r.rawDiff != null, raw_diff: r.rawDiff ?? null,
     });
   }
   function logScore(t0: number, ok: boolean, error: string | null, mock?: boolean) {
@@ -270,6 +271,9 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
     $("roast").hidden = true;
     $("btn-copy").hidden = true;
     $("btn-share").hidden = true;
+    $("tips").hidden = true;
+    $("btn-tips").hidden = true;
+    tipsAt = 0;
     S.running = false;
     setStart();
   }
@@ -397,9 +401,63 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
     roast.hidden = false;
     $("btn-copy").hidden = false;
     $("btn-share").hidden = false;
+    showTips(r, true);
     S.running = false; setStart();
     confetti(r.winner);
     fanfare(); sadTrombone();
+  }
+
+  // ---------- 점수 올리는 법 (기준표) ----------
+  // 결과가 뜨면 바로 보여 주고, 닫으면 아래 "📏 점수 올리는 법" 버튼으로 다시 연다.
+  // 진 쪽(대결방에서는 나) 기준으로, 항목마다 "지금 몇 점 → 다음 단계 점수 받으려면" 을 보여 준다.
+  let tipsAt = 0; // 기준표를 연 시각 (닫을 때 몇 초 봤는지 로그)
+  const tipsSide = (r: BattleResult): Side => (room && role !== "viewer" ? mySide() : r.loser);
+  function tipsLog(action: string, r: BattleResult, extra: Record<string, unknown> = {}) {
+    const side = tipsSide(r), p = r[side];
+    const weakest = RUBRIC.reduce((m, c) => (p[c.key] < p[m.key] ? c : m), RUBRIC[0]).key;
+    T.track("score_guide", { action, side, lost: side === r.loser, total: p.total, weakest, mode: mode(), ...extra });
+  }
+  function showTips(r: BattleResult, auto: boolean) {
+    const side = tipsSide(r), p = r[side];
+    const who = room ? (side === mySide() ? "나" : sideName(side)) : side === "p1" ? "1P" : "2P";
+    const el = (tag: string, cls = "", text = "") => {
+      const n = document.createElement(tag);
+      if (cls) n.className = cls;
+      if (text) n.textContent = text;
+      return n;
+    };
+    const body = $("tips-body");
+    body.replaceChildren();
+    body.append(el("p", "tips-lead", `${who} 지금 ${p.total}점 · 낮은 항목부터 한 단계씩 올리면 점수 오름`));
+
+    const list = el("ol", "tips-list");
+    [...RUBRIC].sort((a, b) => p[a.key] - p[b.key]).forEach((c, i) => {
+      const now = p[c.key];
+      const next = [...c.anchors].sort((a, b) => a[0] - b[0]).find(([pt]) => pt > now);
+      const li = el("li", i === 0 ? "weak" : "");
+      li.append(el("b", "", `${c.label} ${now}/25`));
+      li.append(el("span", "", next ? ` → ${next[0]}점: ${next[1]}` : " → 이미 만점 👑"));
+      list.append(li);
+    });
+    body.append(list);
+
+    const more = el("details", "tips-more") as HTMLDetailsElement;
+    more.append(el("summary", "", "전체 채점 기준표 보기"));
+    RUBRIC.forEach((c) => {
+      const box = el("div", "tips-rubric");
+      box.append(el("b", "", `${c.label} (${c.name}) 25점`));
+      const ul = el("ul");
+      c.anchors.forEach(([pt, d]) => ul.append(el("li", "", `${pt}점 = ${d}`)));
+      box.append(ul);
+      more.append(box);
+    });
+    on(more, "toggle", () => { if (more.open) tipsLog("expand", r); });
+    body.append(more);
+
+    $("tips").hidden = false;
+    $("btn-tips").hidden = true;
+    tipsAt = Date.now();
+    tipsLog(auto ? "show" : "reopen", r, { auto });
   }
 
   function confetti(side: Side) {
@@ -623,6 +681,15 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
     if (!room && S.result && !S.running) { T.track("replay", { button: "again", mode: mode() }, 6); T.stage(6); }
     startBattle();
   });
+  on($("tips-close"), "click", () => {
+    $("tips").hidden = true;
+    if (S.result) {
+      tipsLog("close", S.result, { sec_open: tipsAt ? Math.round((Date.now() - tipsAt) / 1000) : null });
+      $("btn-tips").hidden = false;
+    }
+    tipsAt = 0;
+  });
+  on($("btn-tips"), "click", () => { if (S.result) showTips(S.result, false); });
   on($("btn-reset"), "click", () => {
     T.track("replay", { button: room ? "room_home" : "new_round", mode: mode(), after_result: !!S.result }, 6);
     if (S.result) T.stage(6);

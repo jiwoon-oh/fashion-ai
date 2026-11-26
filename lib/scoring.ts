@@ -1,6 +1,6 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
-import { RUBRIC, type Score } from "./rubric";
+import { MOODS, RUBRIC, type Score } from "./rubric";
 
 // 한줄평(조롱) 말투·규칙·검사는 조롱 LLM 모듈(lib/roaster.ts)이 담당한다
 export { FAVORITES, pick } from "./roaster";
@@ -22,6 +22,7 @@ function scorePrompt(style: Style, recent: string[]) {
     "- 사진에 옷차림이 거의 안 보이면 모든 항목 0~3.",
     SAFETY,
     "",
+    `mood: 이 코디의 분위기 종류 하나. ${MOODS.join(" / ")} 중에서 고른다. 애매하면 가장 가까운 것, 정말 모르겠으면 기타.`,
     "nickname: 이 코디를 요약한 웃긴 별명, 12자 이내. (예: \"회색후드 재수생\", \"올블랙 저승사자\")",
     "praise: 이 코디가 배틀에서 이겼을 때 줄 한마디. 칭찬인데 은근 약 올리는 말투, 15자 이내.",
     "roast: 이 코디가 배틀에서 졌을 때 남길 한줄평.",
@@ -37,11 +38,12 @@ const SCORE_SCHEMA = {
     fit: { type: "integer" },
     harmony: { type: "integer" },
     trend: { type: "integer" },
+    mood: { type: "string", enum: [...MOODS] },
     nickname: { type: "string" },
     praise: { type: "string" },
     roast: { type: "string" },
   },
-  required: ["color", "fit", "harmony", "trend", "nickname", "praise", "roast"],
+  required: ["color", "fit", "harmony", "trend", "mood", "nickname", "praise", "roast"],
   additionalProperties: false,
 } as const;
 
@@ -66,7 +68,8 @@ export const clip = (v: unknown, max: number) => String(v ?? "").replace(/\s+/g,
 
 function toScore(d: Record<string, unknown>): Score {
   const s = { color: int25(d.color), fit: int25(d.fit), harmony: int25(d.harmony), trend: int25(d.trend) };
-  return { ...s, total: s.color + s.fit + s.harmony + s.trend, nickname: clip(d.nickname, 20), praise: clip(d.praise, 40) };
+  const mood = (MOODS as readonly string[]).includes(String(d.mood)) ? String(d.mood) : "기타";
+  return { ...s, total: s.color + s.fit + s.harmony + s.trend, nickname: clip(d.nickname, 20), praise: clip(d.praise, 40), mood };
 }
 
 // ---------- 모델 호출 ----------
@@ -131,7 +134,7 @@ function mockScore(hash: string, recent: string[]): { score: Score; roast: strin
   const n = (i: number) => 5 + (parseInt(hash.slice(i * 2, i * 2 + 2), 16) % 21);
   const s = { color: n(0), fit: n(1), harmony: n(2), trend: n(3) };
   return {
-    score: { ...s, total: s.color + s.fit + s.harmony + s.trend, nickname: "테스트 코디 " + hash.slice(0, 3), praise: "(가짜 점수) 오 좀 치네" },
+    score: { ...s, total: s.color + s.fit + s.harmony + s.trend, nickname: "테스트 코디 " + hash.slice(0, 3), praise: "(가짜 점수) 오 좀 치네", mood: "캐주얼" },
     roast: "(가짜 점수) " + fallbackRoast(recent),
     style: "mock",
   };
