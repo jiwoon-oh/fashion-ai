@@ -5,7 +5,7 @@ import { adminClient, currentUser, sessionClient } from "@/lib/supabase/server";
 // 계정을 지우면 profiles·battles·friendships 는 DB 규칙(on delete cascade)으로 같이 지워지고,
 // 점수 캐시(photo_scores)·도전장의 회원 연결은 끊긴다(on delete set null).
 export async function DELETE() {
-  const user = await currentUser();
+  const user = await currentUser({ strict: true });
   const db = adminClient();
   if (!db) return NextResponse.json({ error: "not_configured" }, { status: 503 });
   if (!user) return NextResponse.json({ error: "login_required" }, { status: 401 });

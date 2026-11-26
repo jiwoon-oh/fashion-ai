@@ -20,7 +20,8 @@ export async function proxy(request: NextRequest) {
       },
     },
   });
-  await sb.auth.getUser();
+  // 토큰이 곧 만료되면 갱신해서 쿠키에 다시 넣는다. 서명 확인은 보통 네트워크 없이 처리됨
+  await sb.auth.getClaims();
   return response;
 }
 
