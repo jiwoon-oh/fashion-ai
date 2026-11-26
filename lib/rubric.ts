@@ -51,7 +51,9 @@ export type BattleResult = {
   loser: "p1" | "p2";
   roast: string;
   cachedSides: { p1: boolean; p2: boolean };
-  recorded: boolean;
+  recorded: boolean; // 랭킹에 반영됨 (가짜 점수 판은 false)
+  photoShared: boolean; // 1P 사진이 친구 공개용으로 저장됨
+  mock: boolean;
   loggedIn: boolean;
 };
 

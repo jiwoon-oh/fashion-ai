@@ -55,13 +55,17 @@ export async function POST(request: NextRequest) {
   const hash = { p1: sha(p1).slice(0, 32), p2: sha(p2).slice(0, 32) };
 
   const user = await currentUser();
-  // 가짜 점수 모드(AI 키 없이 시험 배포)에서는 DB에 점수·배틀을 남기지 않는다 → 랭킹이 가짜로 오염되지 않음
-  const db = isMock() ? null : adminClient();
+  const sharePhoto = form.get("share_photo") === "1";
+  const mock = isMock();
+  const db = adminClient();
+  // 가짜 점수 모드(AI 키 없이 시험 배포)에서는 점수 캐시를 DB에 남기지 않는다.
+  // 배틀 기록은 is_mock 표시를 달아 남긴다 → 친구 화면에는 보이고 랭킹에서는 빠짐
+  const scoreDb = mock ? null : db;
 
   // 1) 저장된 점수 꺼내기
   const cached: { p1?: Score; p2?: Score } = {};
-  if (db) {
-    const { data, error } = await db
+  if (scoreDb) {
+    const { data, error } = await scoreDb
       .from("photo_scores")
       .select("hash,color,fit,harmony,trend,total,nickname,praise")
       .eq("rubric_version", RUBRIC_VERSION)
@@ -80,9 +84,9 @@ export async function POST(request: NextRequest) {
   // 2) 새로 채점할 장수만큼 하루 제한 확인 (가짜 점수 모드는 제한 없음)
   const freshSides = (["p1", "p2"] as const).filter((s) => !cached[s] && !(s === "p2" && hash.p2 === hash.p1));
   const ipHash = sha("ootd:" + (request.headers.get("x-forwarded-for")?.split(",")[0].trim() || "local")).slice(0, 32);
-  if (db && freshSides.length && !isMock()) {
+  if (scoreDb && freshSides.length) {
     const since = startOfTodayKst().toISOString();
-    const q = db.from("photo_scores").select("hash", { count: "exact", head: true }).gte("created_at", since);
+    const q = scoreDb.from("photo_scores").select("hash", { count: "exact", head: true }).gte("created_at", since);
     const { count } = await (user ? q.eq("scored_by", user.id) : q.eq("scored_ip", ipHash));
     const used = count ?? 0;
     const limit = user ? DAILY_LIMIT : ANON_DAILY_LIMIT;
@@ -97,8 +101,8 @@ export async function POST(request: NextRequest) {
         const { score, roast } = await scorePhoto(img[side]!, hash[side]);
         cached[side] = score;
         freshRoast[side] = roast;
-        if (db) {
-          const { error } = await db.from("photo_scores").upsert(
+        if (scoreDb) {
+          const { error } = await scoreDb.from("photo_scores").upsert(
             { hash: hash[side], rubric_version: RUBRIC_VERSION, ...score, scored_by: user?.id ?? null, scored_ip: ipHash },
             { onConflict: "hash,rubric_version", ignoreDuplicates: true },
           );
@@ -129,10 +133,21 @@ export async function POST(request: NextRequest) {
   }
   if (!roast) roast = pick(FAVORITES);
 
-  // 5) 로그인했으면 기록 → 랭킹 반영 (같은 사진끼리는 기록 안 함)
+  // 5) 로그인했으면 기록 → 랭킹·친구 화면 반영 (같은 사진끼리는 기록 안 함)
   let recorded = false;
+  let photoShared = false;
   if (user && db && hash.p1 !== hash.p2) {
+    // 친구 공개를 켰으면 1P 사진(내 사진)만 비공개 저장소에 올린다. 2P 사진은 절대 저장 안 함
+    let p1PhotoPath: string | null = null;
+    if (sharePhoto) {
+      const path = `${user.id}/${hash.p1}.jpg`;
+      const { error: upErr } = await db.storage.from("photos").upload(path, p1, { contentType: "image/jpeg", upsert: true });
+      if (upErr) console.error("photo upload", upErr.message);
+      else { p1PhotoPath = path; photoShared = true; }
+    }
     const { error } = await db.from("battles").insert({
+      is_mock: mock,
+      p1_photo_path: p1PhotoPath,
       user_id: user.id,
       p1_hash: hash.p1,
       p2_hash: hash.p2,
@@ -142,7 +157,7 @@ export async function POST(request: NextRequest) {
       p1_nickname: s1.nickname,
     });
     if (error) console.error("battles write", error.message);
-    else recorded = true;
+    else recorded = !mock;
   }
 
   const body: BattleResult = {
@@ -153,6 +168,8 @@ export async function POST(request: NextRequest) {
     roast,
     cachedSides: { p1: !freshSides.includes("p1"), p2: !freshSides.includes("p2") },
     recorded,
+    photoShared,
+    mock,
     loggedIn: !!user,
   };
   return NextResponse.json(body);

@@ -19,7 +19,13 @@ const ERR: Record<string, string> = {
   not_configured: "서버에 AI 키가 아직 없음 (관리자 확인 필요)",
 };
 
-export function initBattle({ loggedIn }: { loggedIn: boolean }): () => void {
+type InitOpts = {
+  loggedIn: boolean;
+  sharePhoto: () => boolean;
+  onShare: (result: BattleResult, p1Photo: Blob | null) => void;
+};
+
+export function initBattle({ loggedIn, sharePhoto, onShare }: InitOpts): () => void {
   const $ = (id: string) => document.getElementById(id) as HTMLElement;
   const off = new AbortController();
   const on = <K extends keyof HTMLElementEventMap>(el: EventTarget, ev: K | string, fn: (e: Event) => void) =>
@@ -164,6 +170,7 @@ export function initBattle({ loggedIn }: { loggedIn: boolean }): () => void {
     });
     $("roast").hidden = true;
     $("btn-copy").hidden = true;
+    $("btn-share").hidden = true;
     S.running = false;
     setStart();
   }
@@ -187,6 +194,7 @@ export function initBattle({ loggedIn }: { loggedIn: boolean }): () => void {
     const fd = new FormData();
     fd.append("p1", S.p1.blob, "p1.jpg");
     fd.append("p2", S.p2.blob, "p2.jpg");
+    if (loggedIn && sharePhoto()) fd.append("share_photo", "1");
     let r: BattleResult;
     try {
       const res = await fetch("/api/battle", { method: "POST", body: fd, signal: ctl.signal });
@@ -267,7 +275,7 @@ export function initBattle({ loggedIn }: { loggedIn: boolean }): () => void {
     addStamp(r.winner, "win-label", "WIN!!");
     addStamp(r.loser, "lose", "패배");
     const tie = r.p1.total === r.p2.total;
-    const rankNote = r.recorded ? " (랭킹 반영됨)" : loggedIn ? "" : " · 로그인하면 랭킹 올라감";
+    const rankNote = r.recorded ? " (랭킹 반영됨)" : r.mock && loggedIn ? " (가짜 점수라 랭킹엔 안 올라감)" : loggedIn ? "" : " · 로그인하면 랭킹 올라감";
     setStatus((tie ? "동점인데 " + W + "가 세부 점수로 이김 ㅋ" : W + " 승리 ㅋㅋㅋ " + L + " 반성하셈") + rankNote);
     $("roast-label").textContent = "AI 한줄평 ▶ " + L + "에게";
     roast.classList.add("to-" + r.loser);
@@ -278,6 +286,7 @@ export function initBattle({ loggedIn }: { loggedIn: boolean }): () => void {
     $("roast-text").replaceChildren(mark);
     roast.hidden = false;
     $("btn-copy").hidden = false;
+    $("btn-share").hidden = false;
     S.running = false; setStart();
     confetti(r.winner);
     fanfare(); sadTrombone();
@@ -326,6 +335,9 @@ export function initBattle({ loggedIn }: { loggedIn: boolean }): () => void {
     });
     setStart();
     setStatus("사진 두 장 올리고 START 누르셈");
+  });
+  on($("btn-share"), "click", () => {
+    if (S.result) onShare(S.result, S.p1?.blob ?? null);
   });
   on($("btn-copy"), "click", async () => {
     const r = S.result; if (!r) return;

@@ -74,15 +74,39 @@ create table if not exists public.battles (
 create index if not exists battles_by_time on public.battles (created_at);
 create index if not exists battles_by_user on public.battles (user_id);
 
+-- 3-1) (추가) 가짜 점수 판 표시, 친구 공개용 1P 사진 경로
+alter table public.battles add column if not exists is_mock boolean not null default false;
+alter table public.battles add column if not exists p1_photo_path text;   -- 저장소 'photos' 안의 경로. null 이면 사진 비공개
+
+-- 3-2) (추가) 친구: 초대 코드 + 친구 관계 (양쪽 방향으로 한 줄씩)
+alter table public.profiles add column if not exists invite_code text
+  default lower(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8));
+update public.profiles set invite_code = lower(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8)) where invite_code is null;
+create unique index if not exists profiles_invite_code on public.profiles (invite_code);
+
+create table if not exists public.friendships (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  friend_id uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (user_id, friend_id),
+  check (user_id <> friend_id)
+);
+
+-- 3-3) (추가) 친구 공개용 사진 저장소 (비공개 버킷, 서버가 잠깐 쓰는 링크로만 보여줌)
+insert into storage.buckets (id, name, public)
+values ('photos', 'photos', false)
+on conflict (id) do nothing;
+
 -- 4) 보안: 브라우저(공개 키)에서는 아무 표도 직접 못 읽고 못 씀.
 --    읽기·쓰기는 전부 서버(비밀 키)를 거친다.
 alter table public.profiles enable row level security;
 alter table public.photo_scores enable row level security;
 alter table public.battles enable row level security;
+alter table public.friendships enable row level security;
 
 -- 서버(비밀 키 = service_role)는 읽고 쓸 수 있게 권한을 명시한다.
 -- (최근 Supabase 프로젝트는 새 표에 기본 권한을 자동으로 주지 않을 수 있음)
-grant select, insert, update, delete on public.profiles, public.photo_scores, public.battles to service_role;
+grant select, insert, update, delete on public.profiles, public.photo_scores, public.battles, public.friendships to service_role;
 grant usage, select on all sequences in schema public to service_role;
 
 -- 5) 랭킹 계산
@@ -99,7 +123,7 @@ set search_path = ''
 as $$
   with b as (
     select * from public.battles
-    where not hidden and (since is null or created_at >= since)
+    where not hidden and not is_mock and (since is null or created_at >= since)
   ),
   best as (
     select distinct on (b.user_id) b.user_id, b.p1_total::int as value, b.p1_nickname as detail, b.created_at as at
