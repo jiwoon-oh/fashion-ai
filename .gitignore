@@ -10,3 +10,5 @@ game_research/
 next-env.d.ts
 *.tsbuildinfo
 .claude/
+
+__pycache__/

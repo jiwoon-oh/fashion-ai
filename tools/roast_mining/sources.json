@@ -1,0 +1,19 @@
+{
+  "_comment": "R1 수집 대상. 목록 페이지의 '제목'만 가져온다(본문·댓글·이미지 X). link_re는 글 링크 href 정규식. {page}는 페이지 번호.",
+  "user_agent": "ootd-battle-roast-research/0.1 (personal research, titles only, low rate)",
+  "delay_sec": 1.5,
+  "default_pages": 5,
+  "sources": [
+    {"id": "dc_fashion",   "site": "dcinside", "board": "패션 갤러리",     "url": "https://gall.dcinside.com/board/lists/?id=fashion70&page={page}", "link_re": "/board/view/\\?id=fashion70&no=\\d+"},
+    {"id": "dc_best",      "site": "dcinside", "board": "실시간 베스트",   "url": "https://gall.dcinside.com/board/lists/?id=dcbest&page={page}",    "link_re": "/board/view/\\?id=dcbest&no=\\d+"},
+    {"id": "fm_fashion",   "site": "fmkorea",  "board": "패션",           "url": "https://www.fmkorea.com/index.php?mid=fashion&page={page}",      "link_re": "^/(index\\.php\\?mid=fashion&(amp;)?document_srl=\\d+|\\d{6,})"},
+    {"id": "fm_humor",     "site": "fmkorea",  "board": "유머",           "url": "https://www.fmkorea.com/index.php?mid=humor&page={page}",        "link_re": "^/(index\\.php\\?mid=humor&(amp;)?document_srl=\\d+|\\d{6,})"},
+    {"id": "fm_best",      "site": "fmkorea",  "board": "포텐",           "url": "https://www.fmkorea.com/index.php?mid=best&page={page}",         "link_re": "^/(index\\.php\\?mid=best&(amp;)?document_srl=\\d+|\\d{6,})"},
+    {"id": "ruli_humor",   "site": "ruliweb",  "board": "유머 베스트",     "url": "https://bbs.ruliweb.com/best/humor?page={page}",                 "link_re": "/best/board/\\d+/read/\\d+"},
+    {"id": "instiz_pt",    "site": "instiz",   "board": "이슈",           "url": "https://www.instiz.net/pt?page={page}",                          "link_re": "^(https://www\\.instiz\\.net)?/pt/\\d+"},
+    {"id": "theqoo_hot",   "site": "theqoo",   "board": "HOT",            "url": "https://theqoo.net/hot?page={page}",                             "link_re": "^(https://theqoo\\.net)?/hot/\\d+"}
+  ],
+  "blocked_or_skipped": {
+    "ppomppu": "403 Forbidden (2026-11-26 확인) — 우회하지 않고 제외"
+  }
+}

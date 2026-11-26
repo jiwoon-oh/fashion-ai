@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { RUBRIC_VERSION, decideWinner, type BattleResult, type Score } from "@/lib/rubric";
-import { FAVORITES, ScoringError, isMock, pick, roastPhoto, scorePhoto, scoringMode } from "@/lib/scoring";
+import { ScoringError, isMock, roastPhoto, scorePhoto, scoringMode } from "@/lib/scoring";
+import { fallbackRoast, guardRoast } from "@/lib/roaster";
 import { adminClient, currentUser } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -123,15 +124,16 @@ export async function POST(request: NextRequest) {
   // 4) 승패와 한줄평
   const winner = decideWinner(s1, s2, hash.p1, hash.p2);
   const loser = winner === "p1" ? "p2" : "p1";
-  let roast = freshRoast[loser] ?? "";
+  // 한줄평: 방금 채점하며 같이 만든 것 → 없거나 검사 탈락이면 조롱 LLM 전용 호출 → 그래도 안 되면 은행 문장
+  let roast = guardRoast(freshRoast[loser]) ?? "";
   if (!roast) {
     try {
-      roast = await roastPhoto(img[loser]!, cached[loser]!, cached[winner]!);
+      roast = guardRoast(await roastPhoto(img[loser]!, cached[loser]!, cached[winner]!)) ?? "";
     } catch {
       roast = "";
     }
   }
-  if (!roast) roast = pick(FAVORITES);
+  if (!roast) roast = fallbackRoast();
 
   // 5) 로그인했으면 기록 → 랭킹·친구 화면 반영 (같은 사진끼리는 기록 안 함)
   let recorded = false;

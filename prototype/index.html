@@ -317,6 +317,7 @@ header { text-align: center; position: relative; }
   text-shadow: 3px 3px 0 var(--ink);
   min-height: 1.3em;
 }
+.status[hidden] { display: none !important; }
 .status.small { font-family: var(--body); font-size: 17px; color: var(--ink); -webkit-text-stroke: 0; text-shadow: none; background: var(--paper); border: 3px solid var(--ink); padding: 8px 12px; box-shadow: 4px 4px 0 var(--hot); }
 .status.judging::after { content: ""; display: inline-block; width: 1.2em; text-align: left; animation: dots 1s steps(4) infinite; }
 @keyframes dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
@@ -792,6 +793,7 @@ body.tension::after {
     const el = $("status");
     el.textContent = text;
     el.className = "status" + (mode ? " " + mode : "");
+    el.hidden = !text;
   }
 
   function setStart() {
@@ -984,8 +986,7 @@ body.tension::after {
     addStamp(r.winner, "crown", "👑");
     addStamp(r.winner, "win-label", "WIN!!");
     addStamp(r.loser, "lose", "패배");
-    const tie = r.p1.total === r.p2.total;
-    setStatus(tie ? "동점인데 " + W + "가 세부 점수로 이김 ㅋ" : W + " 승리 ㅋㅋㅋ " + L + " 반성하셈");
+    setStatus(""); // 승패 문구 배너 없앰 (2026-11-26)
     $("roast-label").textContent = "AI 한줄평 ▶ " + L + "에게";
     roast.classList.add("to-" + r.loser);
     const praise = r[r.winner].praise;

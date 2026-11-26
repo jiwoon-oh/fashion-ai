@@ -148,6 +148,7 @@ export function initBattle({ loggedIn, sharePhoto, onShare }: InitOpts): () => v
     const el = $("status");
     el.textContent = text;
     el.className = "status" + (mode ? " " + mode : "");
+    el.hidden = !text;
   }
   function setStart() {
     const b = $("btn-start") as HTMLButtonElement;
@@ -274,9 +275,9 @@ export function initBattle({ loggedIn, sharePhoto, onShare }: InitOpts): () => v
     addStamp(r.winner, "crown", "👑");
     addStamp(r.winner, "win-label", "WIN!!");
     addStamp(r.loser, "lose", "패배");
-    const tie = r.p1.total === r.p2.total;
-    const rankNote = r.recorded ? " (랭킹 반영됨)" : r.mock && loggedIn ? " (가짜 점수라 랭킹엔 안 올라감)" : loggedIn ? "" : " · 로그인하면 랭킹 올라감";
-    setStatus((tie ? "동점인데 " + W + "가 세부 점수로 이김 ㅋ" : W + " 승리 ㅋㅋㅋ " + L + " 반성하셈") + rankNote);
+    // 승패 문구 배너는 없앰(사용자 요청 2026-11-26). 랭킹 안내만 작게 남기고, 없으면 배너 자체를 숨김
+    const rankNote = r.recorded ? "랭킹 반영됨" : r.mock && loggedIn ? "가짜 점수라 랭킹엔 안 올라감" : loggedIn ? "" : "로그인하면 랭킹 올라감";
+    setStatus(rankNote, "small");
     $("roast-label").textContent = "AI 한줄평 ▶ " + L + "에게";
     roast.classList.add("to-" + r.loser);
     const praise = r[r.winner].praise;

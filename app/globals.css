@@ -310,6 +310,7 @@ header { text-align: center; position: relative; }
   text-shadow: 3px 3px 0 var(--ink);
   min-height: 1.3em;
 }
+.status[hidden] { display: none !important; }
 .status.small { font-family: var(--body); font-size: 17px; color: var(--ink); -webkit-text-stroke: 0; text-shadow: none; background: var(--paper); border: 3px solid var(--ink); padding: 8px 12px; box-shadow: 4px 4px 0 var(--hot); }
 .status.judging::after { content: ""; display: inline-block; width: 1.2em; text-align: left; animation: dots 1s steps(4) infinite; }
 @keyframes dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
