@@ -97,16 +97,38 @@ insert into storage.buckets (id, name, public)
 values ('photos', 'photos', false)
 on conflict (id) do nothing;
 
+-- 3-4) (추가) 링크 대결방: 1P가 자기 폰에서 사진 올리고 링크를 보내면 2P가 자기 폰에서 붙는다.
+--      사진은 'photos' 저장소의 rooms/<코드>/ 에 24시간만 두고, 서버가 방 만들 때마다 오래된 방을 지운다.
+create table if not exists public.battle_rooms (
+  code text primary key,
+  host_token_hash text not null,          -- 방장 폰 확인용 (토큰 원문은 저장 안 함)
+  host_id uuid references auth.users (id) on delete set null,
+  host_name text not null default '',
+  host_share boolean not null default false,
+  p1_hash text not null,
+  p1_score jsonb not null,
+  p1_cached boolean not null default false,
+  guest_id uuid references auth.users (id) on delete set null,
+  guest_name text,
+  p2_hash text,
+  result jsonb,                           -- 점수·승패·한줄평 (결과 나면 채워짐)
+  is_mock boolean not null default false,
+  created_at timestamptz not null default now(),
+  finished_at timestamptz
+);
+create index if not exists battle_rooms_by_time on public.battle_rooms (created_at);
+
 -- 4) 보안: 브라우저(공개 키)에서는 아무 표도 직접 못 읽고 못 씀.
 --    읽기·쓰기는 전부 서버(비밀 키)를 거친다.
 alter table public.profiles enable row level security;
 alter table public.photo_scores enable row level security;
 alter table public.battles enable row level security;
 alter table public.friendships enable row level security;
+alter table public.battle_rooms enable row level security;
 
 -- 서버(비밀 키 = service_role)는 읽고 쓸 수 있게 권한을 명시한다.
 -- (최근 Supabase 프로젝트는 새 표에 기본 권한을 자동으로 주지 않을 수 있음)
-grant select, insert, update, delete on public.profiles, public.photo_scores, public.battles, public.friendships to service_role;
+grant select, insert, update, delete on public.profiles, public.photo_scores, public.battles, public.friendships, public.battle_rooms to service_role;
 grant usage, select on all sequences in schema public to service_role;
 
 -- 5) 랭킹 계산

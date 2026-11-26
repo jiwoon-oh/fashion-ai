@@ -286,6 +286,9 @@ header { text-align: center; position: relative; }
 .bar .num { text-align: right; font-variant-numeric: tabular-nums; }
 
 .btnrow { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.btnrow[hidden] { display: none !important; }
+.bigbtn small { font-size: 0.7em; opacity: 0.85; }
+input.file-overlay:disabled { pointer-events: none; }
 .btn98 {
   background: var(--gray98);
   color: var(--ink);

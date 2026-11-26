@@ -4,12 +4,12 @@ import { RUBRIC, type Score } from "./rubric";
 
 // 한줄평(조롱) 말투·규칙·검사는 조롱 LLM 모듈(lib/roaster.ts)이 담당한다
 export { FAVORITES, pick } from "./roaster";
-import { FAVORITES, pick, pickStyle, roastRules, roasterSystem, SAFETY, type Style } from "./roaster";
+import { fallbackRoast, pickStyle, roastRules, roasterSystem, SAFETY, type Style } from "./roaster";
 
 const rubricText = () =>
   RUBRIC.map((c) => `- ${c.key} (${c.name}):\n` + c.anchors.map(([p, d]) => `    ${p}점 = ${d}`).join("\n")).join("\n");
 
-function scorePrompt(style: Style) {
+function scorePrompt(style: Style, recent: string[]) {
   return [
     "너는 패션 배틀 게임 \"옷빨 배틀\"의 채점 엔진이다.",
     "사진 1장의 옷차림만 아래 고정 기준표로 채점한다.",
@@ -25,7 +25,7 @@ function scorePrompt(style: Style) {
     "nickname: 이 코디를 요약한 웃긴 별명, 12자 이내. (예: \"회색후드 재수생\", \"올블랙 저승사자\")",
     "praise: 이 코디가 배틀에서 이겼을 때 줄 한마디. 칭찬인데 은근 약 올리는 말투, 15자 이내.",
     "roast: 이 코디가 배틀에서 졌을 때 남길 한줄평.",
-    roastRules(style),
+    roastRules(style, recent),
   ].join("\n");
 }
 
@@ -127,24 +127,24 @@ async function askJson(system: string, jpeg: Buffer, schema: object, maxTokens: 
 }
 
 // 키 없이 화면을 시험할 때: 지문으로 정해지는 가짜 점수
-function mockScore(hash: string): { score: Score; roast: string } {
+function mockScore(hash: string, recent: string[]): { score: Score; roast: string } {
   const n = (i: number) => 5 + (parseInt(hash.slice(i * 2, i * 2 + 2), 16) % 21);
   const s = { color: n(0), fit: n(1), harmony: n(2), trend: n(3) };
   return {
     score: { ...s, total: s.color + s.fit + s.harmony + s.trend, nickname: "테스트 코디 " + hash.slice(0, 3), praise: "(가짜 점수) 오 좀 치네" },
-    roast: "(가짜 점수) " + pick(FAVORITES),
+    roast: "(가짜 점수) " + fallbackRoast(recent),
   };
 }
 
-export async function scorePhoto(jpeg: Buffer, hash: string): Promise<{ score: Score; roast: string }> {
-  if (isMock()) return mockScore(hash);
-  const d = await askJson(scorePrompt(pickStyle()), jpeg, SCORE_SCHEMA, 4000);
+export async function scorePhoto(jpeg: Buffer, hash: string, recent: string[] = []): Promise<{ score: Score; roast: string }> {
+  if (isMock()) return mockScore(hash, recent);
+  const d = await askJson(scorePrompt(pickStyle(), recent), jpeg, SCORE_SCHEMA, 4000);
   return { score: toScore(d), roast: clip(d.roast, 90) };
 }
 
-export async function roastPhoto(jpeg: Buffer, me: Score, other: Score): Promise<string> {
-  if (isMock()) return "(가짜 점수) " + pick(FAVORITES);
+export async function roastPhoto(jpeg: Buffer, me: Score, other: Score, recent: string[] = []): Promise<string> {
+  if (isMock()) return "(가짜 점수) " + fallbackRoast(recent);
   const weakest = RUBRIC.reduce((m, c) => (me[c.key] < me[m.key] ? c : m), RUBRIC[0]).name;
-  const d = await askJson(roasterSystem(pickStyle(), me.total, other.total, weakest), jpeg, ROAST_SCHEMA, 2000, ROAST_MODEL);
+  const d = await askJson(roasterSystem(pickStyle(), me.total, other.total, weakest, recent), jpeg, ROAST_SCHEMA, 2000, ROAST_MODEL);
   return clip(d.roast, 90);
 }

@@ -1,15 +1,26 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { initBattle } from "@/lib/battle-client";
+import { initBattle, type RoomInfo } from "@/lib/battle-client";
 import type { BattleResult } from "@/lib/rubric";
 import ShareSheet from "./ShareSheet";
 
 const SHARE_PHOTO_KEY = "ootd-share-photo";
 
 // 화면 뼈대는 프로토타입 그대로. 동작은 lib/battle-client.ts 가 붙인다.
-export default function Battle({ loggedIn, inviteCode }: { loggedIn: boolean; inviteCode?: string | null }) {
+type Props = {
+  loggedIn: boolean;
+  inviteCode?: string | null;
+  /** 링크 대결방 코드 (/r/<코드> 화면) */
+  room?: string;
+  /** 방금 만든 방이면 도전장 공유창을 바로 띄움 */
+  roomNew?: boolean;
+};
+
+export default function Battle({ loggedIn, inviteCode, room, roomNew }: Props) {
   const [shareItem, setShareItem] = useState<{ result: BattleResult; photo: Blob | null } | null>(null);
+  const [roomInfo, setRoomInfo] = useState<RoomInfo | null>(null);
+  const [inviting, setInviting] = useState(false);
   const [sharePhoto, setSharePhoto] = useState(true);
   const sharePhotoRef = useRef(true);
   const [origin, setOrigin] = useState("");
@@ -28,12 +39,28 @@ export default function Battle({ loggedIn, inviteCode }: { loggedIn: boolean; in
   };
 
   useEffect(
-    () => initBattle({ loggedIn, sharePhoto: () => sharePhotoRef.current, onShare: (result, photo) => setShareItem({ result, photo }) }),
-    [loggedIn],
+    () => initBattle({
+      loggedIn,
+      room,
+      sharePhoto: () => sharePhotoRef.current,
+      onShare: (result, photo) => setShareItem({ result, photo }),
+      onRoom: (info) => {
+        setRoomInfo(info);
+        if (info.status !== "waiting") setInviting(false); // 결과 뜨면 도전장 공유창은 닫기
+        // 방금 만든 도전장이면 공유창 바로 열기 (새로고침해도 다시 안 열리게 주소에서 new 빼기)
+        if (roomNew && info.role === "host" && info.status === "waiting") {
+          setInviting(true);
+          window.history.replaceState(null, "", window.location.pathname);
+        }
+      },
+    }),
+    [loggedIn, room, roomNew],
   );
 
   // 로그인했으면 내 초대 코드를 붙여서, 링크로 들어온 사람이 로그인하면 바로 친구가 되게
   const shareUrl = origin + (inviteCode ? `/?ref=${inviteCode}` : "/");
+  const roomUrl = room ? origin + `/r/${room}` + (inviteCode ? `?ref=${inviteCode}` : "") : "";
+  const hostWaiting = roomInfo?.role === "host" && roomInfo.status === "waiting";
 
   return (
     <>
@@ -42,7 +69,7 @@ export default function Battle({ loggedIn, inviteCode }: { loggedIn: boolean; in
         {(["p1", "p2"] as const).map((side) => (
           <section key={side} className={`win98 ${side}`} id={`panel-${side}`} aria-label={side === "p1" ? "1P" : "2P"}>
             <div className="titlebar">
-              <span className="name">{side === "p1" ? "1P_내코디.jpg - 그림판" : "2P_상대코디.jpg - 그림판"}</span>
+              <span className="name" id={`title-${side}`}>{side === "p1" ? "1P_내코디.jpg - 그림판" : "2P_상대코디.jpg - 그림판"}</span>
               <span className="tb-btns" aria-hidden="true"><i>_</i><i>□</i><i>x</i></span>
             </div>
             <div className="winbody">
@@ -54,7 +81,7 @@ export default function Battle({ loggedIn, inviteCode }: { loggedIn: boolean; in
               </div>
               <div className="nick" id={`nick-${side}`} />
               <div className="bars" id={`bars-${side}`} hidden />
-              <div className="btnrow">
+              <div className="btnrow" id={`btns-${side}`}>
                 <label className="btn98">📸 찍기<input type="file" className="file-overlay" accept="image/*" capture="environment" data-side={side} aria-label="카메라로 찍기" /></label>
                 <label className="btn98">🖼 앨범<input type="file" className="file-overlay" accept="image/*" data-side={side} aria-label="앨범에서 고르기" /></label>
               </div>
@@ -70,7 +97,7 @@ export default function Battle({ loggedIn, inviteCode }: { loggedIn: boolean; in
         </label>
       )}
 
-      <div className="status" id="status" aria-live="polite">사진 두 장 올리고 START 누르셈</div>
+      <div className="status" id="status" aria-live="polite">{room ? "도전장 여는 중…" : "사진 두 장 올리고 START 누르셈"}</div>
 
       <div className="roast" id="roast" hidden aria-live="polite">
         <span className="roast-label" id="roast-label">AI 한줄평</span>
@@ -79,9 +106,17 @@ export default function Battle({ loggedIn, inviteCode }: { loggedIn: boolean; in
       </div>
 
       <div className="controls">
+        {!room && (
+          <button className="bigbtn pink" type="button" id="btn-challenge" title="1P 칸에 내 코디 올리고 누르면, 친구가 자기 폰에서 2P로 붙을 수 있는 링크가 만들어짐">
+            🔗 도전장 보내기 <small>(친구는 자기 폰으로)</small>
+          </button>
+        )}
+        {hostWaiting && (
+          <button className="bigbtn pink" type="button" onClick={() => setInviting(true)}>📨 도전장 다시 보내기</button>
+        )}
         <button className="bigbtn pink" type="button" id="btn-share" hidden>📤 결과 공유</button>
         <button className="bigbtn plain" type="button" id="btn-copy" hidden>📋 한줄평 복사</button>
-        <button className="bigbtn plain" type="button" id="btn-reset">🗑 새 판</button>
+        <button className="bigbtn plain" type="button" id="btn-reset">{room ? "🏠 새 판 하러 가기" : "🗑 새 판"}</button>
         <button className="bigbtn plain" type="button" id="btn-sound" aria-pressed="true">🔊 소리 ON</button>
       </div>
 
@@ -89,11 +124,23 @@ export default function Battle({ loggedIn, inviteCode }: { loggedIn: boolean; in
         <span className="counter" id="counter">TOTAL BATTLE 000</span>
         <span className="note">
           채점할 때만 사진을 AI한테 보내고 버림. 얼굴·몸매는 안 보고 옷만 봄.
+          {" "}도전장(링크 대결)은 양쪽이 결과를 보도록 두 사진을 24시간만 보관하고 지움.
           {loggedIn
             ? " 1P가 내 사진으로 랭킹에 올라감. 위 체크를 켜면 1P 사진만 친구 공개용으로 저장됨 (친구 탭에서 언제든 삭제)."
             : " 로그인하면 1P 점수가 랭킹에 올라감."}
         </span>
       </footer>
+
+      {inviting && roomUrl && roomInfo && (
+        <ShareSheet
+          title="도전장.exe"
+          lead="이 링크 받은 친구가 자기 폰에서 사진 올리면 이 화면에 바로 결과 뜸"
+          text={`[옷빨 배틀] ${roomInfo.hostName} 님이 옷빨 배틀 신청함 ㅋㅋ 링크 열고 네 코디 올려서 붙어봐`}
+          url={roomUrl}
+          card={{ kind: "invite", url: roomUrl, inviter: roomInfo.hostName }}
+          onClose={() => setInviting(false)}
+        />
+      )}
 
       {shareItem && origin && (
         <ShareSheet

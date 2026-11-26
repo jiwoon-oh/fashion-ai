@@ -5,7 +5,7 @@ import { RUBRIC, type BattleResult } from "./rubric";
 // 프로토타입의 화면 동작을 거의 그대로 옮겼다.
 // 바뀐 점: 채점을 브라우저의 Claude 대신 우리 서버(/api/battle)에 맡긴다.
 
-type Side = "p1" | "p2";
+export type Side = "p1" | "p2";
 type Photo = { blob: Blob; url: string };
 
 const ERR: Record<string, string> = {
@@ -17,15 +17,62 @@ const ERR: Record<string, string> = {
   too_big: "사진이 너무 큼. 다른 사진으로 ㄱ",
   invalid_json: "AI가 말을 더듬음 ㅋ 다시 START 눌러줘",
   not_configured: "서버에 AI 키가 아직 없음 (관리자 확인 필요)",
+  room_taken: "이 도전장은 이미 누가 받아버림 ㅠ 새로고침하면 결과 보임",
+  room_expired: "도전장 유효기간(24시간) 끝남 ㅠ 새로 보내달라고 해",
+  own_room: "내가 보낸 도전장임 ㅋ 링크를 친구한테 보내셈",
+  not_found: "없는 도전장이거나 지워진 방임",
+  room_failed: "도전장 만들다 삐끗함. 다시 눌러줘",
 };
+
+// ---------- 최근 한줄평 (같은 문장 30판 안에 다시 안 나오게 서버에 알려줌) ----------
+const RECENT_KEY = "ootd-recent-roasts";
+const RECENT_MAX = 30;
+function readRecent(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]");
+    return Array.isArray(v) ? v.filter((x) => typeof x === "string").slice(-RECENT_MAX) : [];
+  } catch {
+    return [];
+  }
+}
+function pushRecent(roast: string) {
+  if (!roast) return;
+  const list = readRecent().filter((x) => x !== roast);
+  list.push(roast);
+  try { localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(-RECENT_MAX))); } catch { /* 저장 못 해도 괜찮음 */ }
+}
+
+// ---------- 링크 대결방: 방장 토큰은 이 브라우저에만 ----------
+const roomTokenKey = (code: string) => "ootd-room:" + code;
+export function saveRoomToken(code: string, token: string) {
+  try { localStorage.setItem(roomTokenKey(code), token); } catch { /* 무시 */ }
+}
+function readRoomToken(code: string) {
+  try { return localStorage.getItem(roomTokenKey(code)); } catch { return null; }
+}
+
+/** 공유 카드는 "나" 기준이라 2P로 붙은 사람은 좌우를 바꿔서 넘긴다 */
+export function asMine(r: BattleResult, me: Side): BattleResult {
+  if (me === "p1") return r;
+  const flip = (s: Side): Side => (s === "p1" ? "p2" : "p1");
+  return { ...r, p1: r.p2, p2: r.p1, winner: flip(r.winner), loser: flip(r.loser), cachedSides: { p1: r.cachedSides.p2, p2: r.cachedSides.p1 } };
+}
+
+export type RoomInfo = { code: string; role: "host" | "guest" | "viewer"; status: "waiting" | "done" | "expired" | "missing"; hostName: string; guestName: string | null };
+type RoomView = { status: "waiting" | "done" | "expired"; role: "host" | "guest" | "viewer"; hostName: string; guestName: string | null; result: BattleResult | null };
 
 type InitOpts = {
   loggedIn: boolean;
   sharePhoto: () => boolean;
-  onShare: (result: BattleResult, p1Photo: Blob | null) => void;
+  /** 결과 공유: 결과는 "나"가 1P인 모양으로, 사진은 내 사진 */
+  onShare: (result: BattleResult, myPhoto: Blob | null) => void;
+  /** 링크 대결방 화면이면 방 코드 */
+  room?: string;
+  /** 대결방 상태가 바뀔 때 (도전장 다시 보내기 버튼 등) */
+  onRoom?: (info: RoomInfo) => void;
 };
 
-export function initBattle({ loggedIn, sharePhoto, onShare }: InitOpts): () => void {
+export function initBattle({ loggedIn, sharePhoto, onShare, room, onRoom }: InitOpts): () => void {
   const $ = (id: string) => document.getElementById(id) as HTMLElement;
   const off = new AbortController();
   const on = <K extends keyof HTMLElementEventMap>(el: EventTarget, ev: K | string, fn: (e: Event) => void) =>
@@ -34,6 +81,12 @@ export function initBattle({ loggedIn, sharePhoto, onShare }: InitOpts): () => v
   const S: { p1: Photo | null; p2: Photo | null; ctl: AbortController | null; result: BattleResult | null; sound: boolean; running: boolean } = {
     p1: null, p2: null, ctl: null, result: null, sound: true, running: false,
   };
+  // 링크 대결방 상태 (일반 배틀이면 role 은 null)
+  let role: RoomInfo["role"] | null = null;
+  let poll: ReturnType<typeof setInterval> | undefined;
+  const token = room ? readRoomToken(room) : null;
+  const roomHeaders = (): HeadersInit => (token ? { "x-room-token": token } : {});
+  const mySide = (): Side => (role === "guest" ? "p2" : "p1");
 
   // ---------- 소리 ----------
   let ac: AudioContext | null = null;
@@ -101,6 +154,7 @@ export function initBattle({ loggedIn, sharePhoto, onShare }: InitOpts): () => v
   }
 
   async function setPhoto(side: Side, file: File) {
+    if (room && !(role === "guest" && side === "p2" && !S.result)) return; // 대결방에서는 2P(나)만 올림
     if (!file || (file.type && !file.type.startsWith("image/"))) { setStatus("이건 사진 파일이 아님 ㅋ 다른 거 ㄱ", "small"); return; }
     setStatus("사진 읽는 중…", "small");
     const blob = await prepImage(file);
@@ -115,7 +169,8 @@ export function initBattle({ loggedIn, sharePhoto, onShare }: InitOpts): () => v
     $("media-" + side).replaceChildren(img);
     blip();
     clearResult();
-    if (S.p1 && S.p2) setStatus("준비 완료! 가운데 START 눌러");
+    if (room) setStatus("준비 완료! START 누르면 1P 코디도 공개됨");
+    else if (S.p1 && S.p2) setStatus("준비 완료! 가운데 START 눌러");
     else setStatus((S.p1 ? "2P" : "1P") + " 사진 기다리는 중… 빨리 내놔");
   }
 
@@ -140,7 +195,7 @@ export function initBattle({ loggedIn, sharePhoto, onShare }: InitOpts): () => v
   on(document, "paste", (e) => {
     const item = [...((e as ClipboardEvent).clipboardData?.items || [])].find((i) => i.type.startsWith("image/"));
     const f = item?.getAsFile();
-    if (f) setPhoto(!S.p1 ? "p1" : "p2", f);
+    if (f) setPhoto(room ? "p2" : !S.p1 ? "p1" : "p2", f);
   });
 
   // ---------- 화면 상태 ----------
@@ -154,6 +209,14 @@ export function initBattle({ loggedIn, sharePhoto, onShare }: InitOpts): () => v
     const b = $("btn-start") as HTMLButtonElement;
     const both = !!(S.p1 && S.p2);
     b.classList.remove("ready", "busy");
+    if (room) {
+      const can = role === "guest" && !!S.p2 && !S.result && !S.running;
+      b.disabled = !can;
+      b.textContent = S.running ? "···" : S.result ? "끝" : can ? "START" : role === "host" ? "⏳" : "VS";
+      if (can) b.classList.add("ready");
+      if (S.running) b.classList.add("busy");
+      return;
+    }
     if (S.running) { b.disabled = true; b.textContent = "···"; b.classList.add("busy"); }
     else if (both) { b.disabled = false; b.textContent = S.result ? "AGAIN" : "START"; b.classList.add("ready"); }
     else { b.disabled = true; b.textContent = "VS"; }
@@ -184,6 +247,7 @@ export function initBattle({ loggedIn, sharePhoto, onShare }: InitOpts): () => v
 
   // ---------- 채점: 서버에 두 장 보내기 ----------
   async function startBattle() {
+    if (room) return joinRoom();
     if (!S.p1 || !S.p2) return;
     clearResult();
     const ctl = new AbortController();
@@ -196,6 +260,7 @@ export function initBattle({ loggedIn, sharePhoto, onShare }: InitOpts): () => v
     fd.append("p1", S.p1.blob, "p1.jpg");
     fd.append("p2", S.p2.blob, "p2.jpg");
     if (loggedIn && sharePhoto()) fd.append("share_photo", "1");
+    fd.append("recent", JSON.stringify(readRecent()));
     let r: BattleResult;
     try {
       const res = await fetch("/api/battle", { method: "POST", body: fd, signal: ctl.signal });
@@ -276,12 +341,14 @@ export function initBattle({ loggedIn, sharePhoto, onShare }: InitOpts): () => v
     addStamp(r.winner, "win-label", "WIN!!");
     addStamp(r.loser, "lose", "패배");
     // 승패 문구 배너는 없앰(사용자 요청 2026-11-26). 랭킹 안내만 작게 남기고, 없으면 배너 자체를 숨김
-    const rankNote = r.recorded ? "랭킹 반영됨" : r.mock && loggedIn ? "가짜 점수라 랭킹엔 안 올라감" : loggedIn ? "" : "로그인하면 랭킹 올라감";
+    const rankNote = role === "viewer" ? "이미 끝난 대결임. 나도 붙고 싶으면 아래 🗑 새 판"
+      : r.recorded ? "랭킹 반영됨" : r.mock && loggedIn ? "가짜 점수라 랭킹엔 안 올라감" : loggedIn ? "" : "로그인하면 랭킹 올라감";
     setStatus(rankNote, "small");
-    $("roast-label").textContent = "AI 한줄평 ▶ " + L + "에게";
+    $("roast-label").textContent = "AI 한줄평 ▶ " + (room ? sideName(r.loser) : L) + "에게";
+    if (role !== "viewer") pushRecent(r.roast);
     roast.classList.add("to-" + r.loser);
     const praise = r[r.winner].praise;
-    $("praise").textContent = praise ? "(" + W + "한테는) " + praise : "";
+    $("praise").textContent = praise ? "(" + (room ? sideName(r.winner) : W) + "한테는) " + praise : "";
     const mark = document.createElement("mark");
     mark.textContent = r.roast;
     $("roast-text").replaceChildren(mark);
@@ -320,9 +387,191 @@ export function initBattle({ loggedIn, sharePhoto, onShare }: InitOpts): () => v
   }
   showCount(readCount());
 
+  // ---------- 링크 대결 ----------
+  let names = { p1: "1P", p2: "2P" };
+  function sideName(side: Side) {
+    return names[side];
+  }
+  function showBlob(side: Side, blob: Blob) {
+    const old = S[side];
+    if (old) URL.revokeObjectURL(old.url);
+    const url = URL.createObjectURL(blob);
+    S[side] = { blob, url };
+    const img = document.createElement("img");
+    img.src = url; img.alt = sideName(side) + " 코디 사진";
+    $("media-" + side).replaceChildren(img);
+  }
+  function showNote(side: Side, big: string, small: string) {
+    const box = document.createElement("div"); box.className = "placeholder";
+    const b = document.createElement("b"); b.textContent = big;
+    const sm = document.createElement("small"); sm.textContent = small;
+    box.append(b, sm);
+    $("media-" + side).replaceChildren(box);
+  }
+  function lockSide(side: Side, locked: boolean) {
+    document.querySelectorAll<HTMLInputElement>(`input.file-overlay[data-side=${side}]`).forEach((i) => { i.disabled = locked; });
+    const row = document.getElementById("btns-" + side);
+    if (row) row.hidden = locked;
+  }
+  async function fetchPhoto(side: Side): Promise<Blob | null> {
+    try {
+      const res = await fetch(`/api/rooms/${room}/photo?side=${side}`, { headers: roomHeaders(), cache: "no-store" });
+      return res.ok ? await res.blob() : null;
+    } catch {
+      return null;
+    }
+  }
+  function applyRoom(v: RoomView | null) {
+    if (!room) return;
+    if (!v) {
+      role = "viewer";
+      lockSide("p1", true); lockSide("p2", true);
+      showNote("p1", "😵", "없는 도전장이거나 지워짐");
+      showNote("p2", "😵", "새 판에서 다시 도전장 보내줘");
+      setStatus(ERR.not_found, "small");
+      onRoom?.({ code: room, role: "viewer", status: "missing", hostName: "", guestName: null });
+      setStart();
+      return;
+    }
+    role = v.role;
+    names = { p1: v.hostName || "1P", p2: v.guestName || (v.role === "guest" ? "나" : "2P") };
+    $("title-p1").textContent = `1P_${names.p1}.jpg - 그림판`;
+    $("title-p2").textContent = `2P_${names.p2}.jpg - 그림판`;
+    lockSide("p1", true);
+    lockSide("p2", !(v.role === "guest" && v.status === "waiting"));
+    onRoom?.({ code: room, role: v.role, status: v.status, hostName: v.hostName, guestName: v.guestName });
+  }
+
+  async function loadRoom() {
+    if (!room) return;
+    setStatus("도전장 여는 중…", "small");
+    let v: RoomView | null = null;
+    try {
+      const res = await fetch(`/api/rooms/${room}`, { headers: roomHeaders(), cache: "no-store" });
+      if (res.ok) v = await res.json();
+    } catch { /* 아래에서 안내 */ }
+    if (off.signal.aborted) return;
+    applyRoom(v);
+    if (!v) return;
+    if (v.status === "done" && v.result) {
+      const [a, b] = await Promise.all([fetchPhoto("p1"), fetchPhoto("p2")]);
+      if (a) showBlob("p1", a); else showNote("p1", "1P", "사진은 지워짐");
+      if (b) showBlob("p2", b); else showNote("p2", "2P", "사진은 지워짐");
+      reveal(v.result);
+      return;
+    }
+    if (v.status === "expired") {
+      showNote("p1", "⌛", "도전장 유효기간 끝남");
+      showNote("p2", "⌛", "새로 보내달라고 해");
+      setStatus(ERR.room_expired, "small");
+      setStart();
+      return;
+    }
+    if (v.role === "host") {
+      const a = await fetchPhoto("p1");
+      if (a) showBlob("p1", a);
+      showNote("p2", "⏳", "친구가 링크 열고 사진 올리면 여기서 바로 결과 뜸");
+      setStatus("도전장 보냄! 2P가 자기 폰에서 사진 올리면 이 화면에 결과 뜸 (24시간 유효)");
+      startPolling();
+    } else {
+      showNote("p1", "🔒", `${names.p1} 님 코디는 START 누르면 공개`);
+      setStatus(`${names.p1} 님이 옷빨 배틀 신청함! 2P 칸에 내 코디 올리고 START`);
+    }
+    setStart();
+  }
+
+  // 방장 폰: 2P가 붙었는지 몇 초마다 확인
+  function startPolling() {
+    if (poll) return;
+    let busy = false;
+    const check = async () => {
+      if (busy || S.result || document.hidden) return;
+      busy = true;
+      try {
+        const res = await fetch(`/api/rooms/${room}`, { headers: roomHeaders(), cache: "no-store" });
+        const v: RoomView | null = res.ok ? await res.json() : null;
+        if (v?.status === "done" && v.result && !S.result) {
+          clearInterval(poll); poll = undefined;
+          applyRoom(v);
+          const b = await fetchPhoto("p2");
+          if (b) showBlob("p2", b);
+          const ctl = new AbortController();
+          S.ctl = ctl; S.running = true; setStart();
+          await tension(800, ctl);
+          if (ctl === S.ctl) reveal(v.result);
+        } else if (v?.status === "expired") {
+          clearInterval(poll); poll = undefined;
+          setStatus(ERR.room_expired, "small");
+        }
+      } catch { /* 다음에 다시 */ }
+      busy = false;
+    };
+    poll = setInterval(check, 2500);
+    on(document, "visibilitychange", () => { if (!document.hidden) check(); });
+  }
+
+  // 2P 폰: 내 사진 보내고 결과 받기
+  async function joinRoom() {
+    if (!S.p2 || S.result || S.running) return;
+    const ctl = new AbortController();
+    S.ctl = ctl; S.running = true; setStart();
+    setStatus("AI가 기준표 들고 째려보는 중", "judging");
+    const fd = new FormData();
+    fd.append("p2", S.p2.blob, "p2.jpg");
+    if (loggedIn && sharePhoto()) fd.append("share_photo", "1");
+    fd.append("recent", JSON.stringify(readRecent()));
+    let v: RoomView;
+    try {
+      const res = await fetch(`/api/rooms/${room}`, { method: "POST", body: fd, headers: roomHeaders(), signal: ctl.signal });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw { code: data?.error };
+      v = data as RoomView;
+    } catch (e) {
+      if (ctl !== S.ctl || (e instanceof DOMException && e.name === "AbortError")) return;
+      const code = (e as { code?: string })?.code;
+      S.running = false;
+      if (code === "room_taken") { loadRoom(); return; }
+      setStatus((code && ERR[code]) || "채점하다 서버가 삐끗함. 다시 START 눌러줘", "small");
+      setStart();
+      return;
+    }
+    if (ctl !== S.ctl || !v.result) return;
+    applyRoom(v);
+    const a = await fetchPhoto("p1");
+    if (a) showBlob("p1", a);
+    await tension(800, ctl);
+    if (ctl !== S.ctl) return;
+    reveal(v.result);
+  }
+
+  // 메인 화면: 1P 사진으로 도전장(링크 대결방) 만들기 → 대결방 화면으로 이동
+  async function makeChallenge() {
+    if (!S.p1) { setStatus("1P 칸에 내 코디 먼저 올리고 도전장 보내기 눌러", "small"); return; }
+    const btn = document.getElementById("btn-challenge") as HTMLButtonElement | null;
+    if (btn) btn.disabled = true;
+    setStatus("내 코디 먼저 채점해 두는 중… (2P는 자기 폰에서 붙음)", "judging");
+    const fd = new FormData();
+    fd.append("p1", S.p1.blob, "p1.jpg");
+    if (loggedIn && sharePhoto()) fd.append("share_photo", "1");
+    try {
+      const res = await fetch("/api/rooms", { method: "POST", body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.code) throw { code: data?.error };
+      saveRoomToken(data.code, data.token);
+      window.location.href = `/r/${data.code}?new=1`;
+    } catch (e) {
+      const code = (e as { code?: string })?.code;
+      setStatus((code && ERR[code]) || ERR.room_failed, "small");
+      if (btn) btn.disabled = false;
+    }
+  }
+
   // ---------- 버튼 ----------
+  const challengeBtn = document.getElementById("btn-challenge");
+  if (challengeBtn) on(challengeBtn, "click", () => { audio(); makeChallenge(); });
   on($("btn-start"), "click", () => { audio(); startBattle(); });
   on($("btn-reset"), "click", () => {
+    if (room) { window.location.href = "/"; return; }
     clearResult();
     (["p1", "p2"] as const).forEach((side) => {
       const ph = S[side];
@@ -338,7 +587,7 @@ export function initBattle({ loggedIn, sharePhoto, onShare }: InitOpts): () => v
     setStatus("사진 두 장 올리고 START 누르셈");
   });
   on($("btn-share"), "click", () => {
-    if (S.result) onShare(S.result, S.p1?.blob ?? null);
+    if (S.result) onShare(asMine(S.result, mySide()), S[mySide()]?.blob ?? null);
   });
   on($("btn-copy"), "click", async () => {
     const r = S.result; if (!r) return;
@@ -360,7 +609,10 @@ export function initBattle({ loggedIn, sharePhoto, onShare }: InitOpts): () => v
     if (S.sound) blip();
   });
 
+  if (room) loadRoom();
+
   return () => {
+    if (poll) clearInterval(poll);
     off.abort();
     S.ctl?.abort();
     (["p1", "p2"] as const).forEach((side) => { const ph = S[side]; if (ph) URL.revokeObjectURL(ph.url); });
