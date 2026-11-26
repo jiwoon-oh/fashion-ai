@@ -87,7 +87,8 @@ export default function TopBar({ userName, inviteCode, authReady, loginFailed }:
 // X 는 Supabase 의 "X / Twitter (OAuth 2.0)" 방식 (provider 이름 "x")
 type Provider = "google" | "kakao" | "x";
 
-export function LoginModal({ authReady, onClose }: { authReady: boolean; onClose: () => void }) {
+/** next: 로그인 뒤 돌아갈 주소 (예: 랭킹 등록 → "/ranking?register=1"). 없으면 메인 */
+export function LoginModal({ authReady, onClose, next }: { authReady: boolean; onClose: () => void; next?: string }) {
   const [msg, setMsg] = useState("");
   const login = async (provider: Provider) => {
     const sb = browserClient();
@@ -95,7 +96,7 @@ export function LoginModal({ authReady, onClose }: { authReady: boolean; onClose
     loginIntent(provider);
     const { error } = await sb.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo: `${window.location.origin}/auth/callback${next ? `?next=${encodeURIComponent(next)}` : ""}` },
     });
     if (error) setMsg("로그인 창을 못 열었음 ㅠ 잠깐 뒤에 다시");
   };

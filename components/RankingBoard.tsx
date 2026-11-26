@@ -38,6 +38,16 @@ export default function RankingBoard({ authReady }: { authReady: boolean }) {
     track("ranking_view", { tab: "weekly", my_rank: mine?.rank ?? null, failed });
   }, [data, failed]);
 
+  // 랭킹 등록 → 로그인하고 돌아오면(?register=1) 바로 닉네임 설정 화면
+  useEffect(() => {
+    if (!data) return;
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("register")) return;
+    url.searchParams.delete("register");
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+    if (data.me.loggedIn && !data.me.registered) setView("name");
+  }, [data]);
+
   const me = data?.me;
   const startRegister = () => (me?.loggedIn ? setView("name") : setLogin(true));
 
@@ -88,7 +98,7 @@ export default function RankingBoard({ authReady }: { authReady: boolean }) {
         </span>
       </p>
 
-      {login && <LoginModal authReady={authReady} onClose={() => setLogin(false)} />}
+      {login && <LoginModal authReady={authReady} next="/ranking?register=1" onClose={() => setLogin(false)} />}
     </div>
   );
 }

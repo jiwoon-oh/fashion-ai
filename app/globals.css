@@ -559,7 +559,7 @@ body.tension::after {
 .rank-table .val { text-align: right; }
 .rank-table .rank-head { font-family: var(--pixel); font-size: 10px; color: var(--gray98-dark); background: var(--gray98); padding: 5px 8px; }
 .rank-table .rank-head .val { color: var(--gray98-dark); font-size: 10px; }
-.rank-reg { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.rank-reg { display: flex; flex-direction: column; align-items: center; gap: 22px; padding-top: 4px; }
 .rank-register { border: 0; cursor: pointer; font-size: 18px; min-height: 48px; }
 .rank-reg-hint { margin: 0; font-size: 13px; text-align: center; }
 .rank-reg .rank-reg-hint { background: rgba(255, 255, 255, .85); border: 2px solid var(--ink); padding: 2px 8px; }
