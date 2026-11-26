@@ -82,9 +82,12 @@ export default function TopBar({ userName, inviteCode, authReady, loginFailed }:
   );
 }
 
+// X 는 Supabase 의 "X / Twitter (OAuth 2.0)" 방식 (provider 이름 "x")
+type Provider = "google" | "kakao" | "x";
+
 function LoginModal({ authReady, onClose }: { authReady: boolean; onClose: () => void }) {
   const [msg, setMsg] = useState("");
-  const login = async (provider: "google" | "kakao") => {
+  const login = async (provider: Provider) => {
     const sb = browserClient();
     if (!sb) return setMsg("아직 로그인 설정 전이라 못 씀 (Supabase 키 넣어야 함)");
     const { error } = await sb.auth.signInWithOAuth({
@@ -99,6 +102,7 @@ function LoginModal({ authReady, onClose }: { authReady: boolean; onClose: () =>
       <div className="btnrow">
         <button className="btn98" type="button" onClick={() => login("google")} disabled={!authReady}>G 구글로</button>
         <button className="btn98" style={{ background: "#fee500" }} type="button" onClick={() => login("kakao")} disabled={!authReady}>💬 카카오로</button>
+        <button className="btn98" style={{ background: "#000", color: "#fff" }} type="button" onClick={() => login("x")} disabled={!authReady}>𝕏 X로</button>
       </div>
       <p className="legal-consent">로그인(가입)은 만 14세 이상만. 14세 미만은 로그인 없이 배틀·도전장만 쓸 수 있음. 로그인하면 <a href="/terms" target="_blank">이용약관</a>과 <a href="/privacy" target="_blank">개인정보처리방침</a>(채점 사진의 미국 AI 전송 포함)에 동의하는 걸로 봄.</p>
       <p className="share-hint">카톡·인스타 안에서 열었으면 구글 로그인이 막힐 수 있음 → 카카오로 하거나 크롬·사파리에서 열어줘</p>

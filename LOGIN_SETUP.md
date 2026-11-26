@@ -281,3 +281,32 @@ Supabase 기본 목록에는 네이버가 없다. 대신 2026년부터 생긴 **
 - 친구 탭 맨 아래 **회원 탈퇴**: 계정 삭제(배틀 기록·친구 관계 같이 삭제).
 - 만 14세 미만: 로그인(가입)은 막고, 로그인 없이 배틀·도전장만 허용. 화면 안내문에 "보호자와 함께, 얼굴 안 나오게 옷만"을 적어 둠. 보호자 동의 절차를 만든 게 아니라서 완전히 위험이 없는 건 아님.
 - 내용은 서비스 실제 동작 기준으로 작성한 초안이다. 법률 검토를 받은 문서는 아니다.
+
+## 12. X(트위터) 로그인 (15분)
+
+로그인 창의 **𝕏 X로** 버튼은 Supabase에서 X를 켜면 자동으로 나타난다 (재배포 필요 없음).
+
+### 12-1. X 개발자 사이트
+1. https://developer.x.com → 로그인 → **Developer Portal** → 무료(Free) 플랜으로 가입 (사용 목적 설명을 영어로 짧게: "Sign in with X for a fashion battle game website. We only read the user's name, username and profile image.")
+2. **Projects & Apps** → 기본으로 생긴 앱(또는 **+ Add App**) 선택
+3. 앱의 **User authentication settings → Set up**
+   - App permissions: **Read**
+   - **Request email from users**: 켜기 (켜려면 아래 두 주소가 필요)
+     - Terms of service: `https://otbbal-battle.vercel.app/terms`
+     - Privacy policy: `https://otbbal-battle.vercel.app/privacy`
+   - Type of App: **Web App, Automated App or Bot** (Confidential client)
+   - Callback URI / Redirect URL: `https://ngofqyqifxuqplskiifk.supabase.co/auth/v1/callback`
+   - Website URL: `https://otbbal-battle.vercel.app`
+   - 저장
+4. **Keys and tokens** 탭 → **OAuth 2.0 Client ID and Client Secret** 복사 (Secret은 한 번만 보임)
+
+### 12-2. Supabase
+1. **Authentication → Sign In / Providers → X / Twitter (OAuth 2.0)** → 켜기
+2. Client ID, Client Secret 붙여넣기 → Save
+   - 목록에 **Twitter (OAuth 1.0a)** 만 있으면 그걸 켜고, X의 **Keys and tokens → API Key and Secret**(Consumer Keys)을 넣는다. 코드는 둘 다 알아서 처리한다.
+3. 이메일을 안 주는 계정도 있으니, 같은 화면에 **Allow users without an email** 같은 옵션이 있으면 켠다.
+
+### 확인
+- 배포 사이트에서 **🔑 로그인** → **𝕏 X로** 버튼이 보이는지 → 로그인 → 오른쪽 위에 이름이 뜨면 성공.
+- 인스타그램 계정 로그인은 메타가 2024년 12월에 일반 계정용을 없애서 지원하지 않는다.
+- 버튼이 안 보이면 Supabase에서 X를 켰는지 확인 (켜진 방식만 버튼이 나온다).
