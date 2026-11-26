@@ -575,6 +575,7 @@ body.tension::after {
 .share-btn.kakao { background: #fee500; }
 .share-btn.insta { background: linear-gradient(135deg, #feda75, #fa7e1e 30%, #d62976 60%, #962fbf 85%); color: #fff; }
 .share-btn.fb { background: #1877f2; color: #fff; }
+.share-btn.fb b { font-family: Arial, sans-serif; font-weight: 700; }
 .share-btn.fbpost { background: #e7f0ff; }
 .share-btn.fbpost b { color: #1877f2; font-family: Arial, sans-serif; font-weight: 700; }
 .share-btn.x { background: #000; color: #fff; }
@@ -659,3 +660,10 @@ body.tension::after {
 .fl-x { border: 0; background: none; color: #999; cursor: pointer; font-size: 13px; padding: 2px; }
 .fl-x:hover { color: #c00; }
 .linkish.plain { color: inherit; }
+
+/* ---------- 인스타 공유 미리보기 ---------- */
+.insta-preview { display: flex; justify-content: center; margin: 4px 0 10px; }
+.insta-preview img { width: min(200px, 55vw); aspect-ratio: 9 / 16; object-fit: cover; border: 2px solid #000; border-radius: 10px; box-shadow: 3px 3px 0 #000; background: #eee; }
+.insta-steps { font-size: 13px; line-height: 1.55; padding-left: 20px; margin: 0 0 10px; }
+.insta-steps li { margin: 3px 0; }
+.btn98.insta-go { background: linear-gradient(135deg, #feda75, #fa7e1e 30%, #d62976 60%, #962fbf 85%); color: #fff; font-weight: 700; }

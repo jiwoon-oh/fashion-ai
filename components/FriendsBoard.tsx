@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FriendSummary, FriendsResponse } from "@/lib/friends";
 import ShareSheet from "./ShareSheet";
+import { withdrawAccount } from "@/lib/account-client";
 
-const INVITE_TEXT = "옷빨 배틀 친구하자 ㅋㅋ 이 링크로 들어와서 로그인하면 서로 코디 점수 볼 수 있음";
+const INVITE_TEXT = "옷빨 배틀 친구하자 ㅋㅋ 이 링크로 들어와서 로그인하면 서로 최고 점수·승수 볼 수 있음";
 
 export default function FriendsBoard() {
   const [data, setData] = useState<FriendsResponse | null>(null);
@@ -56,17 +57,15 @@ export default function FriendsBoard() {
   };
 
   const withdraw = async () => {
-    if (!confirm("정말 탈퇴할까? 내 계정, 배틀 기록, 랭킹, 친구 관계, 저장된 사진이 전부 바로 지워짐. 되돌릴 수 없음!")) return;
-    if (!confirm("마지막 확인: 진짜 탈퇴?")) return;
-    const r = await fetch("/api/me", { method: "DELETE" });
-    if (r.ok) {
-      try { ["ootd-ref", "ootd-share-photo"].forEach((k) => localStorage.removeItem(k)); } catch { /* 무시 */ }
-      alert("탈퇴 완료. 그동안 고마웠음 ㅠ");
-      window.location.href = "/";
-    } else setMsg("탈퇴하다 삐끗함 ㅠ 잠시 뒤 다시 하거나 개인정보처리방침의 연락처로 알려줘");
+    if ((await withdrawAccount()) === "failed") setMsg("탈퇴하다 삐끗함 ㅠ 잠시 뒤 다시 하거나 개인정보처리방침의 연락처로 알려줘");
   };
 
-  if (failed) return <p className="status small">{failed}</p>;
+  if (failed) return (
+    <>
+      <p className="status small">{failed}</p>
+      <p className="withdraw"><button type="button" className="linkish" onClick={withdraw}>회원 탈퇴</button></p>
+    </>
+  );
   if (!data) return <p className="status small">불러오는 중…</p>;
 
   const inviteUrl = origin && data.inviteCode ? `${origin}/?ref=${data.inviteCode}` : origin;

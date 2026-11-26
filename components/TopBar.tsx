@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { browserClient } from "@/lib/supabase/browser";
 import Modal from "./Modal";
 import ShareSheet from "./ShareSheet";
+import { withdrawAccount } from "@/lib/account-client";
 
 type Props = { userName: string | null; inviteCode: string | null; authReady: boolean; loginFailed: boolean };
 
@@ -12,7 +13,7 @@ const INVITE_TEXT = "옷빨 배틀 한판 ㄱ? 코디 사진 올리면 AI가 점
 const REF_KEY = "ootd-ref";
 
 export default function TopBar({ userName, inviteCode, authReady, loginFailed }: Props) {
-  const [open, setOpen] = useState<null | "invite" | "login">(null);
+  const [open, setOpen] = useState<null | "invite" | "login" | "account">(null);
   const [origin, setOrigin] = useState("");
   const [banner, setBanner] = useState("");
 
@@ -57,10 +58,7 @@ export default function TopBar({ userName, inviteCode, authReady, loginFailed }:
         <button className="chip invite" type="button" onClick={() => setOpen("invite")} disabled={!origin}>💌 친구 초대</button>
         {userName ? (
           <>
-            <span className="chip me" title={userName}>👤 {userName}</span>
-            <form action="/auth/signout" method="post">
-              <button className="chip" type="submit">로그아웃</button>
-            </form>
+            <button className="chip me" type="button" title="내 계정 (로그아웃·회원 탈퇴)" onClick={() => setOpen("account")}>👤 {userName} ▾</button>
           </>
         ) : (
           <button className="chip" type="button" onClick={() => setOpen("login")}>🔑 로그인</button>
@@ -70,13 +68,14 @@ export default function TopBar({ userName, inviteCode, authReady, loginFailed }:
       {open === "invite" && (
         <ShareSheet
           title="친구초대.exe"
-          lead={inviteCode ? "이 링크로 들어온 친구가 로그인하면 자동으로 친구 추가됨. 서로 점수·사진 구경 가능 ㅋ" : "링크 보내서 친구 불러와. 로그인하고 보내면 친구 추가까지 자동으로 됨!"}
+          lead={inviteCode ? "이 링크로 들어온 사람이 로그인하면 자동으로 친구 추가됨. 서로 최고 점수·승수 구경 가능 ㅋ" : "링크 보내서 친구 불러와. 로그인하고 보내면 친구 추가까지 자동으로 됨!"}
           text={INVITE_TEXT}
           url={inviteUrl}
           card={{ kind: "invite", url: inviteUrl, inviter: userName }}
           onClose={() => setOpen(null)}
         />
       )}
+      {open === "account" && userName && <AccountModal name={userName} onClose={() => setOpen(null)} />}
       {open === "login" && <LoginModal authReady={authReady} onClose={() => setOpen(null)} />}
       {loginFailed && !userName && open === null && <p className="status small" style={{ width: "100%" }}>로그인 실패함 ㅠ 다시 해봐</p>}
     </nav>
@@ -105,6 +104,27 @@ function LoginModal({ authReady, onClose }: { authReady: boolean; onClose: () =>
       <p className="share-hint">카톡·인스타 안에서 열었으면 구글 로그인이 막힐 수 있음 → 카카오로 하거나 크롬·사파리에서 열어줘</p>
       {!authReady && <p className="rank-empty">지금은 로그인 설정 전이라 버튼이 꺼져 있음</p>}
       {msg && <p>{msg}</p>}
+    </Modal>
+  );
+}
+
+function AccountModal({ name, onClose }: { name: string; onClose: () => void }) {
+  const [msg, setMsg] = useState("");
+  const withdraw = async () => {
+    if ((await withdrawAccount()) === "failed") setMsg("탈퇴하다 삐끗함 ㅠ 잠시 뒤 다시 해줘");
+  };
+  return (
+    <Modal title="내계정.exe" onClose={onClose}>
+      <p>👤 <b>{name}</b> 님으로 로그인 중</p>
+      <div className="btnrow">
+        <Link className="btn98" href="/friends">👯 친구 탭</Link>
+        <form action="/auth/signout" method="post"><button className="btn98" type="submit" style={{ width: "100%" }}>🚪 로그아웃</button></form>
+      </div>
+      <p className="legal-consent"><a href="/privacy">개인정보처리방침</a> · <a href="/terms">이용약관</a></p>
+      <p className="withdraw" style={{ textAlign: "right", marginTop: 8 }}>
+        <button type="button" className="linkish" onClick={withdraw}>회원 탈퇴</button>
+      </p>
+      {msg && <p className="share-hint">{msg}</p>}
     </Modal>
   );
 }
