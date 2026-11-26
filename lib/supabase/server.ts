@@ -32,7 +32,7 @@ export async function currentUser() {
 // 점수·배틀 기록용. 비밀 키를 쓰므로 서버에서만. RLS 를 건너뛴다.
 let admin: SupabaseClient | null = null;
 export function adminClient(): SupabaseClient | null {
-  const key = process.env.SUPABASE_SECRET_KEY;
+  const key = process.env.SUPABASE_SECRET_KEY?.trim();
   if (!SUPABASE_URL || !key) return null;
   return (admin ??= createClient(SUPABASE_URL, key, { auth: { persistSession: false, autoRefreshToken: false } }));
 }

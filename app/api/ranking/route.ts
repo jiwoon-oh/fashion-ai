@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 export type RankRow = { rank: number; name: string; value: number; detail: string | null; me: boolean };
 export type RankingResponse = {
   configured: boolean;
+  dbError?: boolean;
   weekStart: string;
   all: { best: RankRow[]; wins: RankRow[] };
   weekly: { best: RankRow[]; wins: RankRow[] };
@@ -28,11 +29,13 @@ export async function GET() {
     return NextResponse.json({ configured: false, weekStart: weekStart.toISOString(), all: empty, weekly: empty } satisfies RankingResponse);
   }
   const user = await currentUser();
+  let dbError = false;
 
   const load = async (kind: "best" | "wins", since: Date | null): Promise<RankRow[]> => {
     const { data, error } = await db.rpc("get_ranking", { kind, since: since?.toISOString() ?? null, max_rows: 50 });
     if (error) {
       console.error("get_ranking", error.message);
+      dbError = true;
       return [];
     }
     return (data ?? []).map((r: { rank: number; user_id: string; display_name: string; value: number; detail: string | null }) => ({
@@ -52,6 +55,7 @@ export async function GET() {
   ]);
   return NextResponse.json({
     configured: true,
+    dbError,
     weekStart: weekStart.toISOString(),
     all: { best: allBest, wins: allWins },
     weekly: { best: wkBest, wins: wkWins },

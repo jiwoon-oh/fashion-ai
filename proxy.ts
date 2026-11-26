@@ -1,10 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "@/lib/supabase/config";
 
 // 로그인 세션 쿠키를 요청마다 갱신한다 (Supabase 권장 방식)
 export async function proxy(request: NextRequest) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const url = SUPABASE_URL;
+  const key = SUPABASE_PUBLISHABLE_KEY;
   let response = NextResponse.next({ request });
   if (!url || !key) return response;
 
