@@ -99,9 +99,6 @@ export default function Battle({ loggedIn, inviteCode, room, roomNew }: Props) {
         <button className="bigbtn plain" type="button" id="btn-sound" aria-pressed="true">🔊 소리 ON</button>
       </div>
 
-      <footer>
-        <span className="counter" id="counter">TOTAL BATTLE 000</span>
-      </footer>
 
       {inviting && roomUrl && roomInfo && (
         <ShareSheet

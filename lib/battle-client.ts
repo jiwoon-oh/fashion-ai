@@ -356,7 +356,6 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
     S.running = false; setStart();
     confetti(r.winner);
     fanfare(); sadTrombone();
-    bumpCounter();
   }
 
   function confetti(side: Side) {
@@ -375,15 +374,6 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
     }
   }
 
-  // ---------- 카운터 (이 브라우저 기준) ----------
-  const readCount = () => { try { return Number(localStorage.getItem("ootd-battle-count")) || 0; } catch { return 0; } };
-  const showCount = (n: number) => { $("counter").textContent = "TOTAL BATTLE " + String(n).padStart(3, "0"); };
-  function bumpCounter() {
-    const n = readCount() + 1;
-    try { localStorage.setItem("ootd-battle-count", String(n)); } catch { /* 저장 못 해도 괜찮음 */ }
-    showCount(n);
-  }
-  showCount(readCount());
 
   // ---------- 링크 대결 ----------
   let names = { p1: "1P", p2: "2P" };
