@@ -10,8 +10,8 @@ export type Side = "p1" | "p2";
 type Photo = { blob: Blob; url: string };
 
 const ERR: Record<string, string> = {
-  login_required: "로그인 안 하면 하루에 몇 판만 됨 ㅠ 오른쪽 위에서 로그인 ㄱ",
-  daily_limit: "오늘 채점 다 씀 ㅋ 내일 다시 와",
+  login_required: "오늘 10판 다 함 ㅋ 로그인하면 20판까지 됨 → 오른쪽 위에서 로그인 ㄱ",
+  daily_limit: "오늘 20판 다 함 ㅋ 내일 다시 와",
   rate_limited: "AI 숨 좀 쉬자… 잠깐 뒤에 다시 START 눌러줘",
   refused: "AI가 이 사진은 채점 거부함. 다른 사진 ㄱ",
   image_rejected: "사진 파일이 이상함. 다른 사진으로 ㄱ",

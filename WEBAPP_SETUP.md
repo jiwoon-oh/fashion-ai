@@ -139,7 +139,7 @@ ANTHROPIC_API_KEY=
 
 선택 항목 (`.env.example` 참고):
 - `SCORE_MODEL` — 채점 모델. 비우면 `claude-opus-5-5`. 싸게 가려면 `claude-haiku-5-5`.
-- `DAILY_SCORE_LIMIT` / `ANON_DAILY_SCORE_LIMIT` — 하루 채점 장수 제한 (기본 20 / 6).
+- `DAILY_BATTLE_LIMIT` / `ANON_DAILY_BATTLE_LIMIT` — 하루 배틀 판수 제한 (기본 로그인 20판 / 비로그인 10판, 한 판 = 새 사진 2장).
 
 ### 2-8. 내 PC에서 실행해 보기
 

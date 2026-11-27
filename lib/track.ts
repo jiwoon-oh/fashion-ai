@@ -8,7 +8,7 @@ import type { EventName } from "./track-events";
 // - 사진·사진 지문·닉네임·한줄평 원문은 절대 넣지 않는다.
 
 const APP = "otbbal";
-const SESSION_GAP_MS = 15 * 60 * 1000; // 15분 동안 이벤트 없으면 새 세션
+const SESSION_GAP_MS = 7 * 60 * 1000; // 7분 동안 이벤트 없으면 새 세션 (2026-11-27 15분 → 7분)
 const FLUSH_MS = 2000;
 const K = {
   user: "ootd-trk-user",
@@ -155,7 +155,7 @@ function userId(): { id: string; isNew: boolean } {
 
 function saveSession(s: Session) { set(K.session, JSON.stringify(s)); }
 
-/** 지금 세션. 15분 넘게 비었으면 새 세션을 만들고 visit 을 먼저 남긴다 */
+/** 지금 세션. 7분 넘게 비었으면 새 세션을 만들고 visit 을 먼저 남긴다 */
 function session(): Session {
   const now = Date.now();
   const old = getJson<Session>(K.session);

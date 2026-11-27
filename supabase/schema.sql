@@ -192,7 +192,7 @@ create table if not exists public.events (
   app text not null check (app in ('dolsu', 'otbbal')),
   user_id text not null,                      -- 익명 브라우저 id
   auth_uid uuid references auth.users (id) on delete set null, -- 로그인했으면 계정 id (탈퇴하면 연결만 끊김)
-  session_id text not null,                   -- 15분 동안 이벤트 없으면 새 세션
+  session_id text not null,                   -- 7분 동안 이벤트 없으면 새 세션
   event_name text not null,
   stage smallint,
   device text,

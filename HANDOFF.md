@@ -46,3 +46,5 @@
 - 개인정보처리방침·이용약관의 랭킹 문구도 같이 고침.
 
 - 2026-11-27: 한줄평 말투 묶음 비율 지정 — 기본 55% · 예능 자막 30% · 커뮤니티 15% (`lib/roaster.ts` STYLE_GROUPS). 새 말투를 넣으면 범위(from/to)도 같이 고칠 것.
+
+- 2026-11-27: 하루 채점 제한을 판 기준으로: 비로그인 10판 / 로그인 20판 (한 판 = 새 사진 2장, 같은 사진은 안 셈). 환경변수는 `DAILY_BATTLE_LIMIT` / `ANON_DAILY_BATTLE_LIMIT`(비우면 기본값), 예전 `DAILY_SCORE_LIMIT`·`ANON_DAILY_SCORE_LIMIT`는 안 씀. 로그인은 랭킹·친구용. 로그 세션 기준 15분 → 7분 (`lib/track.ts`).

@@ -8,8 +8,11 @@ import { fallbackRoast, guardRoast } from "./roaster";
 // 일반 배틀(/api/battle)과 링크 대결(/api/rooms)이 같이 쓰는 채점·한줄평·기록 로직
 
 export const MAX_BYTES = 3 * 1024 * 1024;
-const DAILY_LIMIT = Number(process.env.DAILY_SCORE_LIMIT) || 20;
-const ANON_DAILY_LIMIT = Number(process.env.ANON_DAILY_SCORE_LIMIT) || 6;
+// 하루 채점 제한 (2026-11-27 사용자 결정): 비로그인 10판, 로그인 20판. 한 판 = 새 사진 2장이라 장수로는 ×2.
+// 이미 채점한 사진(같은 사진)은 다시 세지 않는다. 예전 환경변수(DAILY_SCORE_LIMIT 등, 장수 기준)는 안 씀
+const DAILY_BATTLES = Number(process.env.DAILY_BATTLE_LIMIT) || 20;
+const ANON_DAILY_BATTLES = Number(process.env.ANON_DAILY_BATTLE_LIMIT) || 10;
+const photosFor = (battles: number) => battles * 2;
 
 export const sha = (b: Buffer | string) => createHash("sha256").update(b).digest("hex");
 export const photoHash = (b: Buffer) => sha(b).slice(0, 32);
@@ -88,7 +91,7 @@ export async function getScores(
     const since = startOfTodayKst().toISOString();
     const q = scoreDb.from("photo_scores").select("hash", { count: "exact", head: true }).gte("created_at", since);
     const { count } = await (ctx.user ? q.eq("scored_by", ctx.user.id) : q.eq("scored_ip", ctx.ipHash));
-    const limit = ctx.user ? DAILY_LIMIT : ANON_DAILY_LIMIT;
+    const limit = photosFor(ctx.user ? DAILY_BATTLES : ANON_DAILY_BATTLES);
     if ((count ?? 0) + todo.length > limit) throw new LimitError(ctx.user ? "daily_limit" : "login_required");
   }
 
