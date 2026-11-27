@@ -44,3 +44,5 @@
 - API: `GET /api/ranking`(주간 rows + 내 등록 상태), `POST /api/ranking/register`.
 - **DB 작업 필요:** Supabase SQL Editor에서 `supabase/schema.sql`의 7번(랭킹 등록: profiles.rank_name·ranked_at, get_weekly_ranking)을 실행해야 배포 화면에서 동작. 실행 전엔 랭킹이 비고 "랭킹 DB가 아직 준비 중" 문구가 뜸.
 - 개인정보처리방침·이용약관의 랭킹 문구도 같이 고침.
+
+- 2026-11-27: 한줄평 말투 묶음 비율 지정 — 기본 55% · 예능 자막 30% · 커뮤니티 15% (`lib/roaster.ts` STYLE_GROUPS). 새 말투를 넣으면 범위(from/to)도 같이 고칠 것.

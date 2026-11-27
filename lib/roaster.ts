@@ -53,7 +53,20 @@ const quoteList = (arr: string[]) => arr.map((s) => `"${s}"`).join(" / ");
 /** 기존 예시 + 커뮤니티 은행 문장 */
 const examplesOf = (style: Style) => [...style.ex, ...(BANK_STYLES[style.name] ?? [])];
 
-export const pickStyle = (): Style => pick(ROAST_STYLES);
+// 말투 묶음별 나오는 비율 (2026-11-27 사용자 지정): 기본 55% · 예능 자막 30% · 커뮤니티 15%.
+// 묶음을 먼저 비율대로 고르고, 그 안에서 말투를 똑같은 확률로 고른다. 범위는 ROAST_STYLES 순서(s1~s10 / s11~s13 / s14~s25)
+export const STYLE_GROUPS = [
+  { name: "기본", from: 0, to: 10, weight: 55 },
+  { name: "커뮤니티", from: 10, to: 13, weight: 15 },
+  { name: "예능 자막", from: 13, to: 25, weight: 30 },
+] as const;
+
+export const pickStyle = (): Style => {
+  const total = STYLE_GROUPS.reduce((n, g) => n + g.weight, 0);
+  let r = Math.random() * total;
+  const g = STYLE_GROUPS.find((x) => (r -= x.weight) < 0) ?? STYLE_GROUPS[0];
+  return pick(ROAST_STYLES.slice(g.from, Math.min(g.to, ROAST_STYLES.length)));
+};
 /** 로그에 남기는 스타일 번호 ("s1"~"s25"). 문장 원문 대신 이걸 남긴다. 스타일 순서를 바꾸면 번호도 바뀌니 뒤에만 추가할 것 */
 export const styleKey = (style: Style) => "s" + (ROAST_STYLES.indexOf(style) + 1);
 
