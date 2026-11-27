@@ -318,6 +318,9 @@ input.file-overlay:disabled { pointer-events: none; }
 .status.judging::after { content: ""; display: inline-block; width: 1.2em; text-align: left; animation: dots 1s steps(4) infinite; }
 @keyframes dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
 
+/* 공유된 대결에서 AGAIN 으로 한줄평만 바뀔 때 */
+.roast.rerolled { animation: pop .35s cubic-bezier(.2, 1.6, .4, 1) both; }
+@media (prefers-reduced-motion: reduce) { .roast.rerolled { animation: none; } }
 .roast {
   position: relative;
   background: var(--paper);

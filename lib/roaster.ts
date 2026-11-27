@@ -207,6 +207,14 @@ export function guardRoast(text: string | null | undefined, recent: string[] = [
 /** 대체 문장 후보: 최애 + 스타일 예시 + 커뮤니티 은행 (중복 제거) */
 const POOL = [...new Set([...FAVORITES, ...ROAST_STYLES.flatMap(examplesOf)].map((s) => s.trim()).filter(Boolean))];
 
+/** 공유할 때 받은 한줄평 확인: AI 문장은 검사 통과, 대체로 나간 은행 문장은 그대로 인정 */
+export function acceptSharedRoast(text: string): string | null {
+  const t = String(text ?? "").replace(/\s+/g, " ").trim();
+  if (!t) return null;
+  if (POOL.includes(t)) return t;
+  return guardRoast(t);
+}
+
 /** 모델이 실패했거나 가짜 점수 모드일 때 쓰는 문장. 최근에 본 건 빼고 고른다 */
 export function fallbackRoast(recent: string[] = []): string {
   const fresh = POOL.filter((s) => !isRepeat(s, recent));

@@ -4,7 +4,7 @@ import type { BattleResult } from "@/lib/rubric";
 import { isMock } from "@/lib/scoring";
 import { cleanRecent } from "@/lib/roaster";
 import { errorStatus, getScores, ipHashOf, judge, narrowGap, photoHash, pickRoast, readJpeg, recordBattle, type Ctx } from "@/lib/battle-core";
-import { finishRoom, getPhoto, getRoom, isExpired, isHost, ROOM_TTL_H, type Room } from "@/lib/rooms";
+import { expiresAt as roomExpiresAt, finishRoom, getPhoto, getRoom, isExpired, isHost, type Room } from "@/lib/rooms";
 import { ensureProfile, nameFromMeta } from "@/lib/friends";
 import { adminClient, currentUser } from "@/lib/supabase/server";
 
@@ -21,10 +21,12 @@ export type RoomView = {
   guestName: string | null;
   expiresAt: string;
   result: BattleResult | null;
+  /** 결과 공유 링크로 만든 방 */
+  shared: boolean;
 };
 
 function view(room: Room, role: RoomView["role"], loggedIn: boolean, own?: { recorded: boolean; photoShared: boolean }): RoomView {
-  const expiresAt = new Date(new Date(room.createdAt).getTime() + ROOM_TTL_H * 3600_000).toISOString();
+  const expiresAt = roomExpiresAt(room).toISOString();
   const status = room.result ? "done" : isExpired(room) ? "expired" : "waiting";
   let result: BattleResult | null = null;
   if (room.result) {
@@ -33,7 +35,7 @@ function view(room: Room, role: RoomView["role"], loggedIn: boolean, own?: { rec
     const rec = own ?? { recorded: hostRec, photoShared: false };
     result = { ...room.result, ...rec, loggedIn };
   }
-  return { status, role, hostName: room.hostName, guestName: room.guestName, expiresAt, result };
+  return { status, role, hostName: room.hostName, guestName: room.guestName, expiresAt, result, shared: !!room.result?.keepUntil };
 }
 
 // GET /api/rooms/<코드> (헤더 x-room-token: 방장 토큰) → 방 상태. 방장 폰은 이걸 몇 초마다 확인한다

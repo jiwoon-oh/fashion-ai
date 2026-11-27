@@ -11,6 +11,8 @@ type Props = {
   lead: string; // 창 안내 문구
   text: string; // 같이 보낼 문장
   url: string; // 보낼 링크
+  /** 카톡 공유 카드 그림 (없으면 기본 /og.png). 결과 공유 링크면 두 사진 그림 */
+  imageUrl?: string;
   card: CardInput; // 스토리용 이미지 내용
   onClose: () => void;
   /** 로그용: result = 결과 공유, challenge = 도전장, invite = 친구 초대 */
@@ -19,7 +21,7 @@ type Props = {
   logProps?: Record<string, unknown>;
 };
 
-export default function ShareSheet({ title, lead, text, url: baseUrl, card, onClose, context, logProps }: Props) {
+export default function ShareSheet({ title, lead, text, url: baseUrl, imageUrl, card, onClose, context, logProps }: Props) {
   // 채널마다 링크에 via=<채널> 을 붙인다 → 그 링크로 들어온 사람은 로그에서 source "share"
   const url = baseUrl;
   const urlFor = (ch: string) => withVia(baseUrl, ch);
@@ -57,7 +59,7 @@ export default function ShareSheet({ title, lead, text, url: baseUrl, card, onCl
       title: "옷빨 배틀",
       description: text,
       url: urlFor("kakao"),
-      imageUrl: new URL("/og.png", window.location.origin).toString(),
+      imageUrl: imageUrl ?? new URL("/og.png", window.location.origin).toString(),
       buttonTitle: card.kind === "result" ? "나도 붙어보기" : "배틀 하러 가기",
     });
     if (!ok) copy("카톡을 못 열었어 → 링크 복사했으니 카톡에 붙여넣기", "kakao");

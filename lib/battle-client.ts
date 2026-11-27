@@ -60,14 +60,18 @@ export function asMine(r: BattleResult, me: Side): BattleResult {
   return { ...r, p1: r.p2, p2: r.p1, winner: flip(r.winner), loser: flip(r.loser), cachedSides: { p1: r.cachedSides.p2, p2: r.cachedSides.p1 } };
 }
 
+export type ShareLink = { url: string; image: string };
 export type RoomInfo = { code: string; role: "host" | "guest" | "viewer"; status: "waiting" | "done" | "expired" | "missing"; hostName: string; guestName: string | null };
 type RoomView = { status: "waiting" | "done" | "expired"; role: "host" | "guest" | "viewer"; hostName: string; guestName: string | null; expiresAt?: string; result: BattleResult | null };
 const ROOM_TTL_MS = 24 * 3600_000; // 서버 lib/rooms.ts 의 유효시간과 같게
 
 type InitOpts = {
   loggedIn: boolean;
-  /** 결과 공유: 결과는 "나"가 1P인 모양으로, 사진은 내 사진 */
-  onShare: (result: BattleResult, myPhoto: Blob | null) => void;
+  /**
+   * 결과 공유: 결과는 "나"가 1P인 모양으로, 사진은 내 사진.
+   * link = 이 대결을 그대로 다시 보여 주는 공유 링크(/r/<코드>)와 미리보기 그림 주소. 만들기 실패하면 null
+   */
+  onShare: (result: BattleResult, myPhoto: Blob | null, link: ShareLink | null) => void;
   /** 링크 대결방 화면이면 방 코드 */
   room?: string;
   /** 대결방 상태가 바뀔 때 (도전장 다시 보내기 버튼 등) */
@@ -80,6 +84,7 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
   const on = <K extends keyof HTMLElementEventMap>(el: EventTarget, ev: K | string, fn: (e: Event) => void) =>
     el.addEventListener(ev, fn, { signal: off.signal });
 
+  let shareCode: string | null = null; // 이 결과로 만든 공유 링크 코드 (다시 눌러도 같은 링크)
   const S: { p1: Photo | null; p2: Photo | null; ctl: AbortController | null; result: BattleResult | null; sound: boolean; running: boolean } = {
     p1: null, p2: null, ctl: null, result: null, sound: true, running: false,
   };
@@ -248,9 +253,10 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
     b.classList.remove("ready", "busy");
     if (room) {
       const can = role === "guest" && !!S.p2 && !S.result && !S.running;
-      b.disabled = !can;
-      b.textContent = S.running ? "···" : S.result ? "끝" : can ? "START" : role === "host" ? "⏳" : "VS";
-      if (can) b.classList.add("ready");
+      const again = !!S.result && !S.running; // 끝난 대결: AGAIN = 한줄평만 다시 뽑기
+      b.disabled = !(can || again);
+      b.textContent = S.running ? "···" : again ? "AGAIN" : can ? "START" : role === "host" ? "⏳" : "VS";
+      if (can || again) b.classList.add("ready");
       if (S.running) b.classList.add("busy");
       return;
     }
@@ -260,7 +266,7 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
   }
   function clearResult() {
     S.ctl?.abort();
-    S.ctl = null; S.result = null;
+    S.ctl = null; S.result = null; shareCode = null;
     document.body.classList.remove("tension");
     (["p1", "p2"] as const).forEach((side) => {
       const panel = $("panel-" + side);
@@ -389,7 +395,7 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
     addStamp(r.winner, "win-label", "WIN!!");
     addStamp(r.loser, "lose", "패배");
     // 승패 문구 배너는 없앰(사용자 요청 2026-11-26). 랭킹 안내만 작게 남기고, 없으면 배너 자체를 숨김
-    const rankNote = role === "viewer" ? "이미 끝난 대결임. 나도 붙고 싶으면 아래 🗑 새 판"
+    const rankNote = role === "viewer" ? "끝난 대결 · AGAIN 누르면 한줄평만 새로 뽑음 · 나도 하려면 아래 🏠 새 판"
       : r.recorded ? "기록됨 · 🏆랭킹에서 등록하면 주간 랭킹에 뜸" : r.mock && loggedIn ? "가짜 점수라 랭킹엔 안 올라감" : loggedIn ? "" : "로그인하고 랭킹 등록하면 올라감";
     setStatus(rankNote, "small");
     $("roast-label").textContent = "AI 한줄평 ▶ " + (room ? sideName(r.loser) : L) + "에게";
@@ -682,9 +688,37 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
   if (challengeBtn) on(challengeBtn, "click", () => { audio(); makeChallenge(); });
   on($("btn-start"), "click", () => {
     audio();
+    if (room && S.result) { rerollRoast(); return; }
     if (!room && S.result && !S.running) { T.track("replay", { button: "again", mode: mode() }, 6); T.stage(6); }
     startBattle();
   });
+
+  // 끝난 대결방(공유 링크·도전장)에서 AGAIN: 점수·승패는 그대로, 한줄평만 새로 받아 바꾼다 (방에는 저장 안 함)
+  async function rerollRoast() {
+    if (!room || !S.result || S.running) return;
+    S.running = true; setStart();
+    setStatus("한줄평 다시 뽑는 중…", "judging");
+    T.track("replay", { button: "again_roast", mode: mode() }, 6);
+    try {
+      const res = await fetch(`/api/rooms/${room}/again`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recent: readRecent() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.roast) throw { code: data?.error };
+      S.result = { ...S.result, roast: data.roast, roastStyle: data.roastStyle };
+      const mark = document.createElement("mark");
+      mark.textContent = data.roast;
+      $("roast-text").replaceChildren(mark);
+      const box = $("roast"); box.classList.remove("rerolled"); void box.offsetWidth; box.classList.add("rerolled");
+      pushRecent(data.roast);
+      setStatus("한줄평 새로 뽑음 ㅋ 점수는 그대로", "small");
+      blip();
+    } catch (e) {
+      const code = (e as { code?: string })?.code;
+      setStatus(code === "reroll_limit" ? "이 대결은 한줄평 다시 뽑기를 너무 많이 함 ㅋ 새 판 ㄱ" : code === "room_expired" ? "공유 기간이 끝난 대결임" : "다시 뽑다 삐끗함. 한 번 더 눌러줘", "small");
+    }
+    S.running = false; setStart();
+  }
   on($("tips-close"), "click", () => {
     $("tips").hidden = true;
     if (S.result) {
@@ -714,9 +748,30 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
     setStart();
     setStatus("사진 두 장 올리고 START 누르셈");
   });
-  on($("btn-share"), "click", () => {
+  on($("btn-share"), "click", async () => {
     window.dispatchEvent(new Event(RESULT_LEAVE_EVENT));
-    if (S.result) onShare(asMine(S.result, mySide()), S[mySide()]?.blob ?? null);
+    const r = S.result;
+    if (!r) return;
+    // 공유 링크: 대결방이면 그 방 링크, 한 폰 배틀이면 두 사진·결과를 저장해서 링크를 새로 만든다 (한 결과에 한 번)
+    let code = room ?? shareCode;
+    if (!code && S.p1 && S.p2) {
+      const btn = $("btn-share") as HTMLButtonElement;
+      const label = btn.textContent;
+      btn.disabled = true; btn.textContent = "🔗 링크 만드는 중…";
+      try {
+        const fd = new FormData();
+        fd.append("p1", S.p1.blob, "p1.jpg");
+        fd.append("p2", S.p2.blob, "p2.jpg");
+        fd.append("roast", r.roast);
+        if (r.roastStyle) fd.append("roastStyle", r.roastStyle);
+        const res = await fetch("/api/share", { method: "POST", body: fd });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.code && S.result === r) code = shareCode = data.code;
+      } catch { /* 링크 없이 홈 주소로 공유 */ }
+      btn.disabled = false; btn.textContent = label;
+    }
+    const link = code ? { url: `${location.origin}/r/${code}`, image: `${location.origin}/r/${code}/og` } : null;
+    onShare(asMine(r, mySide()), S[mySide()]?.blob ?? null, link);
   });
   on($("btn-copy"), "click", async () => {
     const r = S.result; if (!r) return;

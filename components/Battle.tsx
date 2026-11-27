@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { initBattle, type RoomInfo } from "@/lib/battle-client";
+import { initBattle, type RoomInfo, type ShareLink } from "@/lib/battle-client";
 import type { BattleResult } from "@/lib/rubric";
 import ShareSheet from "./ShareSheet";
 import SurveyCard from "./SurveyCard";
@@ -17,7 +17,7 @@ type Props = {
 };
 
 export default function Battle({ loggedIn, inviteCode, room, roomNew }: Props) {
-  const [shareItem, setShareItem] = useState<{ result: BattleResult; photo: Blob | null } | null>(null);
+  const [shareItem, setShareItem] = useState<{ result: BattleResult; photo: Blob | null; link: ShareLink | null } | null>(null);
   const [roomInfo, setRoomInfo] = useState<RoomInfo | null>(null);
   const [inviting, setInviting] = useState(false);
   const [origin, setOrigin] = useState("");
@@ -30,7 +30,7 @@ export default function Battle({ loggedIn, inviteCode, room, roomNew }: Props) {
     () => initBattle({
       loggedIn,
       room,
-      onShare: (result, photo) => setShareItem({ result, photo }),
+      onShare: (result, photo, link) => setShareItem({ result, photo, link }),
       onRoom: (info) => {
         setRoomInfo(info);
         if (info.status !== "waiting") setInviting(false); // 결과 뜨면 도전장 공유창은 닫기
@@ -128,10 +128,11 @@ export default function Battle({ loggedIn, inviteCode, room, roomNew }: Props) {
       {shareItem && origin && (
         <ShareSheet
           title="결과공유.exe"
-          lead={shareItem.result.winner === "p1" ? "이겼다 ㅋㅋ 자랑 ㄱㄱ" : "졌지만 공유하면 친구도 당할 수 있음 ㅋ"}
+          lead={(shareItem.result.winner === "p1" ? "이겼다 ㅋㅋ 자랑 ㄱㄱ" : "졌지만 공유하면 친구도 당할 수 있음 ㅋ") + (shareItem.link ? " · 링크 열면 이 대결(두 사진·점수) 그대로 보임, 30일 뒤 자동 삭제" : "")}
           text={`[옷빨 배틀] 나 ${shareItem.result.p1.total}점 vs 상대 ${shareItem.result.p2.total}점 — ${shareItem.result.winner === "p1" ? "내가 이김 👑" : shareItem.result.roast} 너도 붙어볼래?`}
-          url={shareUrl}
-          card={{ kind: "result", url: shareUrl, result: shareItem.result, photo: shareItem.photo }}
+          url={shareItem.link?.url ?? shareUrl}
+          imageUrl={shareItem.link?.image}
+          card={{ kind: "result", url: shareItem.link?.url ?? shareUrl, result: shareItem.result, photo: shareItem.photo }}
           onClose={() => setShareItem(null)}
           context="result"
           logProps={{ me_won: shareItem.result.winner === "p1", roast_style: shareItem.result.roastStyle ?? null, mode: room ? "challenge" : "local" }}

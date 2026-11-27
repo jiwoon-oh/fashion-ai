@@ -10,9 +10,18 @@ import { sha } from "./battle-core";
 
 export const ROOM_TTL_H = 24;
 const TTL_MS = ROOM_TTL_H * 3600_000;
+// 결과 공유 링크(공유 버튼으로 만든 끝난 방)는 30일 보관. result.keepUntil 에 만료 시각을 적어 둔다
+export const SHARE_TTL_DAYS = 30;
+// AGAIN(한줄평 다시 뽑기)은 방 하나에 이만큼까지 (링크가 퍼져도 AI 호출이 끝없이 늘지 않게)
+export const MAX_REROLLS = 30;
 const ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"; // 헷갈리는 글자(i l o 0 1) 뺌
 
-export type RoomResult = Pick<BattleResult, "p1" | "p2" | "winner" | "loser" | "roast" | "roastStyle" | "rawDiff" | "cachedSides" | "mock">;
+export type RoomResult = Pick<BattleResult, "p1" | "p2" | "winner" | "loser" | "roast" | "roastStyle" | "rawDiff" | "cachedSides" | "mock"> & {
+  /** 결과 공유 링크면 만료 시각 (없으면 일반 도전장: 만들고 24시간) */
+  keepUntil?: string;
+  /** AGAIN 으로 한줄평 다시 뽑은 횟수 */
+  rerolls?: number;
+};
 
 export type Room = {
   code: string;
@@ -36,7 +45,8 @@ export const newCode = () => Array.from({ length: 8 }, () => ALPHABET[randomInt(
 export const newToken = () => randomBytes(18).toString("base64url");
 export const tokenHash = (t: string) => sha("room:" + t).slice(0, 40);
 export const validCode = (c: string) => /^[a-z0-9]{8}$/.test(c);
-export const isExpired = (r: Room) => Date.now() - new Date(r.createdAt).getTime() > TTL_MS;
+export const expiresAt = (r: Room) => (r.result?.keepUntil ? new Date(r.result.keepUntil) : new Date(new Date(r.createdAt).getTime() + TTL_MS));
+export const isExpired = (r: Room) => Date.now() > expiresAt(r).getTime();
 export const isHost = (r: Room, token: string | null | undefined) => !!token && tokenHash(token) === r.hostTokenHash;
 
 const photoPath = (code: string, side: "p1" | "p2") => `rooms/${code}/${side}.jpg`;
@@ -125,15 +135,66 @@ export async function finishRoom(
   return true;
 }
 
+/**
+ * 결과 공유용 방: 이미 끝난 대결(두 사진 + 결과)을 그대로 저장한다. 링크를 연 사람은 구경(viewer)으로 본다.
+ */
+export async function createSharedRoom(db: SupabaseClient | null, room: Room, p1: Buffer, p2: Buffer): Promise<boolean> {
+  if (!db) {
+    mem.set(room.code, { room, photos: { p1, p2 } });
+    return true;
+  }
+  const paths = [photoPath(room.code, "p1"), photoPath(room.code, "p2")];
+  for (const [i, img] of [p1, p2].entries()) {
+    const up = await db.storage.from("photos").upload(paths[i], img, { contentType: "image/jpeg", upsert: true });
+    if (up.error) {
+      console.error("share photo upload", up.error.message);
+      await db.storage.from("photos").remove(paths);
+      return false;
+    }
+  }
+  const { error } = await db.from("battle_rooms").insert({
+    code: room.code, host_token_hash: room.hostTokenHash, host_id: room.hostId, host_name: room.hostName, host_share: false,
+    p1_hash: room.p1Hash, p1_score: room.p1Score, p1_cached: room.p1Cached,
+    guest_id: room.guestId, guest_name: room.guestName, p2_hash: room.p2Hash, result: room.result,
+    is_mock: room.isMock, created_at: room.createdAt, finished_at: room.finishedAt,
+  });
+  if (error) {
+    console.error("share insert", error.message);
+    await db.storage.from("photos").remove(paths);
+    return false;
+  }
+  return true;
+}
+
+/** AGAIN 횟수 +1. 한도를 넘으면 false */
+export async function bumpReroll(db: SupabaseClient | null, room: Room): Promise<boolean> {
+  const n = (room.result?.rerolls ?? 0) + 1;
+  if (!room.result || n > MAX_REROLLS) return false;
+  const result = { ...room.result, rerolls: n };
+  if (!db) {
+    const m = mem.get(room.code);
+    if (m) m.room = { ...m.room, result };
+    return true;
+  }
+  const { error } = await db.from("battle_rooms").update({ result }).eq("code", room.code);
+  if (error) console.error("room reroll", error.message);
+  return !error;
+}
+
 /** 만료된 방 정리 (방 만들 때 가끔 같이 돈다): 사진 지우고 행 삭제 */
 export async function cleanupRooms(db: SupabaseClient | null) {
   const cutoff = new Date(Date.now() - TTL_MS).toISOString();
   if (!db) {
-    for (const [k, v] of mem) if (v.room.createdAt < cutoff) mem.delete(k);
+    for (const [k, v] of mem) if (isExpired(v.room)) mem.delete(k);
     return;
   }
-  const { data } = await db.from("battle_rooms").select("code").lt("created_at", cutoff).limit(50);
-  const codes = (data ?? []).map((r: { code: string }) => r.code);
+  // 24시간 지난 방 중에서, 공유 링크(keepUntil)는 그 시각이 지난 것만 지운다
+  const now = Date.now();
+  const { data } = await db.from("battle_rooms").select("code, result").lt("created_at", cutoff).order("created_at").limit(100);
+  const codes = ((data ?? []) as { code: string; result: RoomResult | null }[])
+    .filter((r) => !r.result?.keepUntil || new Date(r.result.keepUntil).getTime() < now)
+    .slice(0, 50)
+    .map((r) => r.code);
   if (!codes.length) return;
   await db.storage.from("photos").remove(codes.flatMap((c) => [photoPath(c, "p1"), photoPath(c, "p2")]));
   await db.from("battle_rooms").delete().in("code", codes);
