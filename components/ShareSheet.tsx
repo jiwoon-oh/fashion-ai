@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { KAKAO_JS_KEY, kakaoShare, preloadKakao } from "@/lib/kakao";
 import { makeShareCard, type CardInput } from "@/lib/share-card";
 import Modal from "./Modal";
-import { stage, track, withVia } from "@/lib/track";
+import { shareGen, stage, track, withVia } from "@/lib/track";
 
 type Props = {
   title: string; // 창 제목
@@ -24,7 +24,7 @@ export default function ShareSheet({ title, lead, text, url: baseUrl, card, onCl
   const url = baseUrl;
   const urlFor = (ch: string) => withVia(baseUrl, ch);
   const log = (channel: string) => {
-    track("share", { channel, context, ...logProps }, context === "result" ? 6 : null);
+    track("share", { channel, context, gen_out: shareGen(), ...logProps }, context === "result" ? 6 : null);
     if (context === "result") stage(6);
   };
   const [note, setNote] = useState("");

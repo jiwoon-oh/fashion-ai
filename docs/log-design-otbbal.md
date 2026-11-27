@@ -105,7 +105,8 @@
 | 7 | 아무것도 없음 | `direct` | | 주소를 직접 쳤거나 알 수 없음 |
 
 - **처음 들어온 경로(first-touch)** 는 사람 단위로 따로 저장한다 (`visit.props.ft_source`). H1은 이 값으로 본다.
-- 주소의 `src` · `from` · `c` · `via` · `internal` · `test`는 읽은 뒤 주소창에서 지운다. 사람들이 주소를 복사해 퍼뜨려도 경로가 섞이지 않게.
+- **공유 · 도전장 링크에는 `s=<보낸 사람 번호표 앞 8자리>` · `g=<전파 단계>`도 자동으로 붙는다** (11/27). 홍보 글 · 직접 온 사람 = 0단계, 그 사람이 보낸 링크로 온 사람 = 1단계, 그 사람이 또 보내면 2단계. 번호표 앞자리는 익명이라 누군지는 모른다.
+- 주소의 `src` · `from` · `c` · `via` · `internal` · `test` · `s` · `g`는 읽은 뒤 주소창에서 지운다. 사람들이 주소를 복사해 퍼뜨려도 경로가 섞이지 않게.
 - `?from=`은 돌수제비 링크 규칙과 맞추려고 받는다. 팀이 링크를 한 가지 방식으로 만들어도 두 웹 모두 읽힌다.
 
 ### 2-3. 일부러 안 남기는 것
@@ -135,7 +136,7 @@
 
 | event_name | 언제 | props | 쉬운 말 / 쓰는 곳 |
 | --- | --- | --- | --- |
-| `visit` | 새 방문 시작 (방문당 1번) | `is_return`(전에 온 적 있나), `visit_n`(이 브라우저 몇 번째 방문), `days_since_last`(지난 방문 뒤 며칠), `landing`(home / room / ranking / friends), `logged_in`, `ref_domain`(직전 사이트 도메인), `ft_source` · `ft_detail`(처음 들어온 경로) | **들어오나 · 어디서 오나 · 다시 오나** (H1, 재방문) |
+| `visit` | 새 방문 시작 (방문당 1번) | `is_return`(전에 온 적 있나), `visit_n`(이 브라우저 몇 번째 방문), `days_since_last`(지난 방문 뒤 며칠), `landing`(home / room / ranking / friends), `logged_in`, `ref_domain`(직전 사이트 도메인), `ft_source` · `ft_detail`(처음 들어온 경로), `from_user`(이 링크를 보낸 사람 번호표 앞 8자리), `gen`(이 링크의 전파 단계), `my_gen`(이 사람의 전파 단계, 처음 들어온 방문 기준), `self_open`(자기가 보낸 링크를 자기가 엶) | **들어오나 · 어디서 오나 · 다시 오나 · 누가 데려왔나** (H1, 재방문, 바이럴) |
 | `stage_enter` | 각 단계에 **처음** 들어갈 때 (방문당 단계마다 1번) | `stage` | **어디서 빠지나** (퍼널) |
 | `first_play` | 이번 방문에서 처음 결과를 봤을 때 | `sec_since_visit`(들어와서 몇 초 만에), `is_first_ever`(평생 처음인지), `mode` | **해보나** (H2) |
 | `play` | 결과 1번 봄 | `nth`(이번 방문 몇 번째) + 4번 표의 배틀 값 | **또 하나** (H3) |
@@ -178,11 +179,11 @@
 | ② | `score_done` | 채점 응답 받았을 때 | `ok`, `wait_ms`(AI 기다린 시간), `error`(daily_limit / login_required / rate_limited / refused / upstream / network), `mock` | **기다리다 지치나, 오류 나나** |
 | ③ | `play` | 점수 공개 연출이 끝났을 때 | `nth`, `mode`, `is_again`, `p1_total`, `p2_total`, `diff`(점수 차), `winner`, `tie`, `me_won`(게스트는 2P 기준), `scores`(4항목 × 2), `roast_style`, `mock`, `same_mood`(두 코디 무드가 같은지), `narrowed`(점수 차를 좁혔는지), `raw_diff`(좁히기 전 원래 점수 차) | 몇 판 하나, **아깝게 진 사람이 다시 하나**, 접전으로 만든 판이 다시 하기로 이어지나 |
 | ④ | `share_open` | 공유창 열림 | `context`(result = 결과 / challenge = 도전장 / invite = 친구 초대), `me_won`, `roast_style`, `mode` | 공유창까지 가나 |
-| ④ | `share` | 공유창 채널 버튼 또는 📋 한줄평 복사 | `channel`(kakao / insta_preview / insta_send / insta_save / threads / x / facebook / copy_link / native / copy_roast), `context`, `roast_style`, `me_won` | **어느 앱으로 퍼뜨리나, 어떤 한줄평이 웃겨서 퍼지나, 이긴 쪽 · 진 쪽 누가 공유하나** |
+| ④ | `share` | 공유창 채널 버튼 또는 📋 한줄평 복사 | `channel`(kakao / insta_preview / insta_send / insta_save / threads / x / facebook / copy_link / native / copy_roast), `context`, `gen_out`(보낸 링크의 전파 단계), `roast_style`, `me_won` | **어느 앱으로 퍼뜨리나, 어떤 한줄평이 웃겨서 퍼지나, 이긴 쪽 · 진 쪽 누가 공유하나** |
 | ④ | `replay` | 버튼 클릭 | `button`(again = 같은 사진 다시 / new_round = 🗑 새 판 / room_home = 도전장 화면에서 새 판), `after_result` | AGAIN 많음 = **한줄평 뽑기가 재밌다** / 새 판 많음 = **대결 자체가 재밌다** |
-| 도전장 | `room_create` | 도전장 생성 응답 받았을 때 | `ok`, `wait_ms`, `error` | 혼자 온 사람이 도전장이라도 쓰나 |
-| 도전장 | `room_open` | `/r/<코드>` 열었을 때 | `role`(host / guest / viewer), `status`(waiting / done / expired / not_found) | **받은 링크를 친구가 진짜 여나**, 만료로 못 하나 |
-| 도전장 | `room_result` | 도전장 만든 사람 화면에 결과가 뜸 | `min_since_create`(만들고 몇 분 뒤) | 도전장이 실제 배틀로 이어지나, 얼마나 걸리나 |
+| 도전장 | `room_create` | 도전장 생성 응답 받았을 때 | `ok`, `room`(방 코드), `wait_ms`, `error` | 혼자 온 사람이 도전장이라도 쓰나 |
+| 도전장 | `room_open` | `/r/<코드>` 열었을 때 | `room`(방 코드), `role`(host / guest / viewer), `status`(waiting / done / expired / not_found) | **받은 링크를 친구가 진짜 여나**, 만료로 못 하나 |
+| 도전장 | `room_result` | 도전장 만든 사람 화면에 결과가 뜸 | `room`(방 코드), `min_since_create`(만들고 몇 분 뒤) | 도전장이 실제 배틀로 이어지나, 얼마나 걸리나 |
 | ③ | `score_guide` | 📏 점수 올리는 법 창: 결과가 뜨면 자동으로 열림 / 닫기 / 다시 열기 / 전체 기준표 펼치기 | `action`(show / close / reopen / expand), `side`, `lost`(진 쪽인지), `total`, `weakest`(제일 낮은 항목), `sec_open`(닫기 전 몇 초 봤나), `mode` | 기준표를 읽나, 바로 닫나, 읽고 나서 AGAIN · 새 판으로 이어지나 |
 | 벽 | `login_prompt` | "로그인해야 더 할 수 있음" 안내가 떴을 때 | `context`, `plays_today` | **3판 제한 벽에서 나가나** |
 | 그 외 | `login` | 로그인 완료 | `provider`, `from`(prompt = 벽 보고 / topbar = 스스로) | 로그인을 하나, 벽 때문에 하나 |
@@ -207,6 +208,9 @@
 | **2판 이상 비율** | 해본 사람 중 몇 %가 또 했나 | `play` 2번 이상 방문 ÷ 첫 플레이 방문 | H3 | AGAIN과 새 판을 나눠서도 본다 |
 | 다시 하기 비율 | 다시 하기 버튼을 누르나 | `replay` 방문 ÷ 첫 플레이 방문, 버튼별 | H3 | |
 | 단계별 이탈 (퍼널) | 어느 계단에서 빠지나 | 1~6단계 도달 방문 수, **모드별** | 2차 근거 | |
+| **한 사람이 데려온 수** | 공유한 사람 1명이 몇 명을 데려왔나 | `visit.from_user`별 방문 수 (보낸 사람마다) | 바이럴 | 0명 · 1명 · 2명+ 분포로 본다 |
+| **전파 단계** | 몇 단계까지 퍼졌나 | `visit.my_gen`별 사람 수 (0 / 1 / 2 / 3+) | 바이럴 | 2단계 이상이 있으면 "저절로 퍼진다" |
+| 도전장 성사율 | 만든 도전장 중 친구가 연 비율 · 결과까지 간 비율 | `room_create.room` ↔ 게스트 `room_open.room` ↔ `room_result.room` 이어 붙이기 | 바이럴 | |
 | 공유율 | 해본 사람 중 몇 %가 공유했나 | `share` 방문 ÷ 플레이 방문, 채널별 | 참고 | `source=share` 방문과 짝지어 **공유 1번이 몇 명을 데려오나** |
 | 오류 · 벽 | 고장 · 제한 때문에 나가나 | `score_done.ok=false` 비율, `login_prompt` 뒤 이탈 | 2차 근거 | **1차 배포 직후 제일 먼저 확인** |
 | 앱 안 업로드 실패 | 인스타 앱에서 사진이 안 올라가나 | `photo_upload.ok=false`를 browser별로 | 2차 근거 | 여기서 막히면 홍보 효과가 통째로 날아감 |
@@ -371,9 +375,50 @@ group by 1;
 | 설문과 `user_id` 연결 | 없음 | ⏳ 옷빨 설문을 붙일 때 같이 (8-3) |
 | 모든 이벤트에 그때의 단계 번호 | 단계 관련 이벤트에만 | 그대로 둠 — 퍼널은 `stage_enter`로 충분 |
 
-### 7-3. 옷빨에만 있는 것 (돌수제비엔 없음)
+### 7-3. 퍼진 경로 SQL (11/27)
 
-- **도전장 흐름** (`room_create` → `room_open` → `room_result`): 친구를 끌고 오는 고리라 바이럴 측정에 핵심
+**보낸 사람 1명이 데려온 방문 수**
+
+```sql
+with sent as (
+  select distinct substr(replace(user_id, '-', ''), 1, 8) as sender
+  from events where app='otbbal' and not is_internal and event_name='share'
+), came as (
+  select props->>'from_user' as sender, count(distinct user_id) as brought
+  from events
+  where app='otbbal' and not is_internal and event_name='visit' and props->>'from_user' is not null
+  group by 1
+)
+select case when coalesce(c.brought, 0) >= 2 then '2+' else coalesce(c.brought, 0)::text end as brought, count(*) as senders
+from sent s left join came c using (sender)
+group by 1 order by 1;
+```
+
+**전파 단계별 사람 수**
+
+```sql
+select coalesce((props->>'my_gen')::int, 0) as gen, count(distinct user_id) as people
+from events
+where app='otbbal' and not is_internal and event_name='visit'
+group by 1 order by 1;
+```
+
+**도전장 성사율**
+
+```sql
+select count(distinct c.props->>'room') as created,
+       count(distinct o.props->>'room') as opened_by_friend,
+       count(distinct r.props->>'room') as finished
+from events c
+left join events o on o.event_name='room_open' and o.props->>'role'='guest' and o.props->>'room' = c.props->>'room'
+left join events r on r.event_name='room_result' and r.props->>'room' = c.props->>'room'
+where c.app='otbbal' and not c.is_internal and c.event_name='room_create' and (c.props->>'ok')::boolean;
+```
+
+### 7-4. 옷빨에만 있는 것 (돌수제비엔 없음)
+
+- **도전장 흐름** (`room_create` → `room_open` → `room_result`, 방 코드로 이어 붙임): 친구를 끌고 오는 고리라 바이럴 측정에 핵심
+- **퍼진 경로** (`from_user` · `gen`): A → B → C로 몇 단계까지 퍼졌는지
 - **로그인 벽** (`login_prompt` → `login`): 제한이 이탈 원인인지
 - **AI 채점 대기 · 오류** (`score_done`): AI 응답이 늦으면 나가는지
 - **한줄평 스타일** (`roast_style`): 어떤 웃음이 공유를 만드는지 → 2차 "어디가 재밌나"의 근거
@@ -457,6 +502,8 @@ delete from public.events where event_time < now() - interval '6 months';
 - [ ] 비로그인으로 새 사진 배틀 4판째(새 사진 7장째)에서 `login_prompt`가 찍힘
 - [ ] 7분 넘게 가만히 있다가 다시 누르면 새 `session_id` + `visit`
 - [ ] 랭킹 닉네임 등록하면 `ranking_register` 찍힘
+- [x] A(스레드 post01) → B → C 공유: 링크에 `s` · `g`가 붙고, B는 `from_user=A앞8자리, gen=1`, C는 `from_user=B앞8자리, gen=2` (개발 서버 확인)
+- [x] `room_create` · `room_open`에 같은 방 코드 (개발 서버 확인)
 - [x] 결과가 뜨면 점수 올리는 법 창이 열리고 `score_guide show` → 닫기 `close`(sec_open) → 📏 버튼 `reopen` → 기준표 펼치기 `expand` (개발 서버 확인)
 - [x] 같은 무드 두 장: 원래 9점 차 → 5점 차로 좁혀지고 `play.narrowed=true, raw_diff=9` (가짜 점수 모드 확인)
 - [ ] 같은 사건을 두 번 보내도 한 줄만 저장됨

@@ -542,7 +542,7 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
     } catch { /* 아래에서 안내 */ }
     if (off.signal.aborted) return;
     applyRoom(v);
-    T.track("room_open", { role: v?.role ?? null, status: v?.status ?? "not_found", mode: mode() });
+    T.track("room_open", { room, role: v?.role ?? null, status: v?.status ?? "not_found", mode: mode() });
     if (!v) return;
     if (v.status === "done" && v.result) {
       const [a, b] = await Promise.all([fetchPhoto("p1"), fetchPhoto("p2")]);
@@ -592,7 +592,7 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
           if (ctl === S.ctl) {
             reveal(v.result);
             const created = v.expiresAt ? new Date(v.expiresAt).getTime() - ROOM_TTL_MS : 0;
-            T.track("room_result", { min_since_create: created ? Math.round((Date.now() - created) / 60000) : null, mode: mode() });
+            T.track("room_result", { room, min_since_create: created ? Math.round((Date.now() - created) / 60000) : null, mode: mode() });
             logPlay(v.result, false);
           }
         } else if (v?.status === "expired") {
@@ -660,7 +660,7 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.code) throw { code: data?.error || "room_failed" };
       saveRoomToken(data.code, data.token);
-      T.track("room_create", { ok: true, wait_ms: Date.now() - t0, error: null }, 3);
+      T.track("room_create", { ok: true, room: data.code, wait_ms: Date.now() - t0, error: null }, 3);
       T.stage(3);
       T.flush(true); // 바로 다른 화면으로 넘어가니 지금 보낸다
       window.location.href = `/r/${data.code}?new=1`;

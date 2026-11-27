@@ -20,6 +20,7 @@ const K = {
   loginIntent: "ootd-trk-login",
   loginPrompt: "ootd-trk-login-prompt",
   visits: "ootd-trk-visits",
+  gen: "ootd-trk-gen",
 };
 
 type Props = Record<string, unknown>;
@@ -155,6 +156,29 @@ function userId(): { id: string; isNew: boolean } {
 
 function saveSession(s: Session) { set(K.session, JSON.stringify(s)); }
 
+// ---------- 퍼진 경로 (누가 보낸 링크로, 몇 단계째 들어왔나) ----------
+// 공유 링크에 s=<보낸 사람 번호표 앞 8자리> 와 g=<전파 단계> 를 붙인다.
+// 홍보 글 · 직접 들어온 사람 = 0단계 → 그 사람이 보낸 링크로 온 사람 = 1단계 → 그 사람이 또 보내면 2단계 …
+// 번호표 앞자리는 익명이라 누군지는 알 수 없다.
+const shortId = (id: string) => id.replace(/-/g, "").slice(0, 8).toLowerCase();
+
+/** 링크에서 보낸 사람 · 단계 읽기 (자기가 보낸 링크를 자기가 연 건 빼고) */
+function chainOf(url: URL): { fromUser: string | null; gen: number | null; selfOpen: boolean } {
+  const s = (url.searchParams.get("s") || "").toLowerCase();
+  const g = Number(url.searchParams.get("g"));
+  const fromUser = /^[0-9a-f]{8}$/.test(s) ? s : null;
+  const gen = Number.isInteger(g) && g >= 1 && g <= 50 ? g : null;
+  const mine = get(K.user);
+  if (fromUser && mine && shortId(mine) === fromUser) return { fromUser: null, gen: null, selfOpen: true };
+  return { fromUser, gen: fromUser ? gen ?? 1 : null, selfOpen: false };
+}
+
+/** 이 사람의 전파 단계 (처음 들어올 때 정해지고 안 바뀜) */
+function myGen(): number {
+  const n = Number(get(K.gen));
+  return Number.isInteger(n) && n >= 0 ? n : 0;
+}
+
 /** 지금 세션. 7분 넘게 비었으면 새 세션을 만들고 visit 을 먼저 남긴다 */
 function session(): Session {
   const now = Date.now();
@@ -167,9 +191,11 @@ function session(): Session {
   const ua = navigator.userAgent;
   const url = !started && landingUrl ? landingUrl : new URL(window.location.href);
   const { source, detail } = sourceOf(url, ua, !started ? landingRef : "");
+  const chain = chainOf(url);
   const s: Session = { id: uuid(), start: now, last: now, stages: [], plays: 0, lastStage: 0, source, detail };
   saveSession(s);
   const u = userId();
+  if (get(K.gen) === null) set(K.gen, String(chain.gen ?? 0)); // 처음 들어온 방문의 단계로 고정
   let ft = getJson<{ source: string; detail: string | null }>(K.firstTouch);
   if (!ft) { ft = { source, detail }; set(K.firstTouch, JSON.stringify(ft)); }
   const path = url.pathname;
@@ -182,6 +208,10 @@ function session(): Session {
     ref_domain: !started ? refDomain(landingRef, url.hostname) : null,
     ft_source: ft.source,
     ft_detail: ft.detail,
+    from_user: chain.fromUser, // 이 링크를 보낸 사람 번호표 앞 8자리 (공유 · 도전장 링크로 왔을 때)
+    gen: chain.gen, // 이 링크의 전파 단계 (1 = 홍보로 온 사람이 보낸 링크)
+    my_gen: myGen(), // 이 사람의 전파 단계 (처음 들어온 방문 기준)
+    self_open: chain.selfOpen || undefined,
   });
   return s;
 }
@@ -319,7 +349,7 @@ export function startTracking(opts: { loggedIn: boolean }) {
   try {
     const u = new URL(window.location.href);
     let changed = false;
-    for (const k of ["src", "from", "c", "via", "internal", "test"]) if (u.searchParams.has(k)) { u.searchParams.delete(k); changed = true; }
+    for (const k of ["src", "from", "c", "via", "internal", "test", "s", "g"]) if (u.searchParams.has(k)) { u.searchParams.delete(k); changed = true; }
     if (changed) window.history.replaceState(window.history.state, "", u.pathname + u.search + u.hash);
   } catch { /* 무시 */ }
 
@@ -340,11 +370,21 @@ export function startTracking(opts: { loggedIn: boolean }) {
   window.addEventListener("pagehide", leave);
 }
 
-/** 공유 링크에 어느 채널로 공유했는지 붙인다 (그 링크로 들어온 사람 = source "share") */
+/** 내가 보내는 링크의 전파 단계 (내 단계 + 1) */
+export const shareGen = () => myGen() + 1;
+
+/**
+ * 공유 링크에 붙이는 표시: via=<채널> (들어온 사람 = source "share"),
+ * s=<내 번호표 앞 8자리> · g=<전파 단계> (누가 보낸 링크로 몇 단계째 퍼졌나)
+ */
 export function withVia(url: string, channel: string): string {
   try {
     const u = new URL(url);
     u.searchParams.set("via", channel);
+    if (isBrowser) {
+      u.searchParams.set("s", shortId(userId().id));
+      u.searchParams.set("g", String(shareGen()));
+    }
     return u.toString();
   } catch {
     return url;
