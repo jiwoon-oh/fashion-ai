@@ -50,3 +50,5 @@
 - 2026-11-27: 하루 채점 제한을 판 기준으로: 비로그인 10판 / 로그인 20판 (한 판 = 새 사진 2장, 같은 사진은 안 셈). 환경변수는 `DAILY_BATTLE_LIMIT` / `ANON_DAILY_BATTLE_LIMIT`(비우면 기본값), 예전 `DAILY_SCORE_LIMIT`·`ANON_DAILY_SCORE_LIMIT`는 안 씀. 로그인은 랭킹·친구용. 로그 세션 기준 15분 → 7분 (`lib/track.ts`).
 
 - 2026-11-27: 1차 설문 카드 (팀 확정안, `components/SurveyCard.tsx` · 설정 `lib/survey-config.ts` · 문서 `docs/survey-otbbal.md`). 누적 2번째 결과(도전장 게스트는 첫 결과)에 📏 창을 닫고 1.5초 뒤 바텀시트로 뜸, 닫으면 2번마다 다시, 최대 3번, 제출하면 끝. 팀 표시 폰은 첫 결과부터(횟수 저장 안 함). 응답은 events 의 survey_view / survey_close / survey_submit. 저장 값 · 이벤트 이름은 돌수제비와 맞춘 것이라 바꾸지 말 것. 개인정보처리방침에 설문 응답 항목 추가.
+
+- 2026-11-27: Haiku 채점 다듬기 — 점수 몰림 방지 프롬프트(r2), 상위권 보정 stretchTop(Haiku만, 최고 97), 사진당 2번 채점 평균(SCORE_SAMPLES, Haiku 기본 2), 한줄평 길면 첫 문장만·예시 베끼기 차단, 이긴 쪽 한마디 금지어 검사. 테스트 도구 evals/model-compare (README 참고).

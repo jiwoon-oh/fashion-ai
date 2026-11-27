@@ -1,5 +1,5 @@
 // 고정 채점 기준표. 화면(막대 그래프)과 서버(프롬프트)가 같은 데이터를 쓴다.
-export const RUBRIC_VERSION = "r1";
+export const RUBRIC_VERSION = "r2"; // r2 (2026-11-27): 점수 몰림 방지 규칙 추가 → 예전(r1) 저장 점수와 섞이지 않게
 
 export type RubricKey = "color" | "fit" | "harmony" | "trend";
 
@@ -33,6 +33,22 @@ export const RUBRIC: { key: RubricKey; label: string; name: string; anchors: [nu
     [5, "잠옷·운동복 그대로 나온 느낌"],
   ] },
 ];
+
+// 상위권 점수 보정 (2026-11-27): 작은 모델(Haiku)은 잘 입은 코디도 항목당 20~22점에서 멈춰서 합계가 84점을 잘 못 넘는다.
+// 15점 이하는 그대로 두고 16점부터 위쪽을 1.4배로 늘린다 (20→22, 21→23, 22→25). 합계는 97점까지만.
+// 예: 20/21/22/21 (84점) → 22/23/25/23 → 97점 넘지 않게 조정 → 93점
+export const STRETCH_TOP = { from: 15, factor: 1.4, maxTotal: 97 };
+export function stretchTop(s: { color: number; fit: number; harmony: number; trend: number }) {
+  const f = (x: number) => (x <= STRETCH_TOP.from ? x : Math.min(25, Math.round(STRETCH_TOP.from + (x - STRETCH_TOP.from) * STRETCH_TOP.factor)));
+  const out = { color: f(s.color), fit: f(s.fit), harmony: f(s.harmony), trend: f(s.trend) };
+  const keys = ["color", "fit", "harmony", "trend"] as const;
+  let total = out.color + out.fit + out.harmony + out.trend;
+  while (total > STRETCH_TOP.maxTotal) {
+    const k = keys.reduce((m, c) => (out[c] > out[m] ? c : m), keys[0]);
+    out[k] -= 1; total -= 1;
+  }
+  return { ...out, total };
+}
 
 // 코디 무드 (분위기 종류). 두 사진 무드가 같으면 점수 차를 3~5점으로 좁혀 "아깝게" 지게 한다 (battle-core narrowGap)
 export const MOODS = ["미니멀", "캐주얼", "스트릿", "포멀", "스포티", "빈티지", "러블리", "기타"] as const;
