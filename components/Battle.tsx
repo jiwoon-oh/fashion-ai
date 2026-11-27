@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { initBattle, type RoomInfo } from "@/lib/battle-client";
 import type { BattleResult } from "@/lib/rubric";
 import ShareSheet from "./ShareSheet";
+import SurveyCard from "./SurveyCard";
 
 // 화면 뼈대는 프로토타입 그대로. 동작은 lib/battle-client.ts 가 붙인다.
 type Props = {
@@ -83,6 +84,8 @@ export default function Battle({ loggedIn, inviteCode, room, roomNew }: Props) {
         <p className="roast-text" id="roast-text" />
         <p className="praise" id="praise" />
       </div>
+
+      <SurveyCard />
 
       {/* 점수 올리는 법: 결과가 뜨면 바로 보이고, x 로 닫으면 아래 📏 버튼으로 다시 열 수 있음 (lib/battle-client.ts showTips) */}
       <section className="win98 tips" id="tips" hidden aria-label="점수 올리는 법">

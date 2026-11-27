@@ -173,6 +173,9 @@ function chainOf(url: URL): { fromUser: string | null; gen: number | null; selfO
   return { fromUser, gen: fromUser ? gen ?? 1 : null, selfOpen: false };
 }
 
+/** 팀 트래픽 표시(?internal=1 · ?test=1 · localhost)인지. 설문 QA 규칙에 씀 */
+export const isInternal = (): boolean => (isBrowser ? internalFlag() : false);
+
 /** 이 사람의 전파 단계 (처음 들어올 때 정해지고 안 바뀜) */
 function myGen(): number {
   const n = Number(get(K.gen));

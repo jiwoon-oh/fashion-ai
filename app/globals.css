@@ -329,6 +329,41 @@ input.file-overlay:disabled { pointer-events: none; }
 }
 .roast[hidden] { display: none !important; }
 
+/* 1차 설문 카드 (components/SurveyCard.tsx): 화면 아래에서 올라오는 시트. 뒤 버튼은 막힘 */
+.survey-back {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(26, 0, 51, .45);
+  display: flex; align-items: flex-end; justify-content: center;
+  padding: 16px 16px 0;
+}
+.survey { width: min(460px, 100%); max-height: 88vh; overflow: auto; transform: none; animation: sheet-up .35s cubic-bezier(.2, 1.2, .4, 1) both; box-shadow: 1px 1px 0 var(--ink), 0 -4px 0 var(--ink); }
+@keyframes sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.survey .titlebar { background: linear-gradient(90deg, #6a00a8, var(--hot)); }
+.survey-later {
+  background: var(--gray98); color: var(--ink);
+  border: 1px solid; border-color: var(--paper) var(--ink) var(--ink) var(--paper);
+  font: inherit; font-size: 12px; padding: 1px 8px; cursor: pointer;
+}
+.survey .winbody { background: var(--paper); border: 2px solid; border-color: var(--gray98-dark) var(--paper) var(--paper) var(--gray98-dark); padding: 12px 12px 18px; gap: 10px; }
+.survey-dots { display: flex; gap: 6px; justify-content: center; font-size: 14px; color: var(--gray98-dark); }
+.survey-dots .on { color: var(--hot); }
+.survey-lead { margin: 0; font-family: var(--display); font-size: 18px; text-align: center; line-height: 1.35; }
+.survey-lead small { font-family: var(--body); font-size: 13px; color: var(--gray98-dark); }
+.survey-q { margin: 0; font-family: var(--display); font-size: 18px; font-weight: 400; }
+.survey-q small { font-family: var(--body); font-size: 13px; color: var(--gray98-dark); }
+.survey-opts { display: grid; gap: 6px; }
+.survey-opt { text-align: left; white-space: normal; min-height: 44px; padding: 8px 12px; font-size: 15px; }
+.survey-opt.on { background: var(--yellow); }
+.survey-other { font: inherit; font-size: 15px; padding: 8px 10px; border: 2px solid var(--ink); width: 100%; box-sizing: border-box; }
+.survey-hint { margin: 0; color: #b00020; font-size: 14px; text-align: center; }
+.survey-next { min-height: 46px; font-size: 16px; background: var(--hot); color: var(--paper); }
+.survey-next:disabled { background: var(--gray98); color: var(--gray98-dark); }
+.survey-toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 61; margin: 0;
+  background: var(--paper); border: 3px solid var(--ink); box-shadow: 4px 4px 0 var(--hot);
+  padding: 10px 16px; font-family: var(--display); font-size: 17px; white-space: nowrap;
+}
+
 /* 점수 올리는 법 (기준표) */
 .tips { transform: rotate(-0.4deg); animation: pop .4s cubic-bezier(.2, 1.6, .4, 1) both .6s; }
 .tips[hidden] { display: none !important; }

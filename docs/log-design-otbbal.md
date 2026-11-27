@@ -372,7 +372,7 @@ group by 1;
 | `start` (안내 화면 → 시작하기) | 해당 없음 (안내 화면 없음) | — |
 | `stone_pick` · `stone_drop` (고르다 바꿈) | `photo_upload.replace`로 이미 있음 | — |
 | `draw` · `pose_set` (부가 기능 사용률) | 해당 기능 없음. 대신 `setting_change` | — |
-| 설문과 `user_id` 연결 | 없음 | ⏳ 옷빨 설문을 붙일 때 같이 (8-3) |
+| 설문과 `user_id` 연결 | 없음 | ✅ **추가 (11/27)**: 게임 안 설문 카드, 응답은 `events`에 `user_id`와 같이 (8-3) |
 | 모든 이벤트에 그때의 단계 번호 | 단계 관련 이벤트에만 | 그대로 둠 — 퍼널은 `stage_enter`로 충분 |
 
 ### 7-3. 퍼진 경로 SQL (11/27)
@@ -465,11 +465,19 @@ where c.app='otbbal' and not c.is_internal and c.event_name='room_create' and (c
 delete from public.events where event_time < now() - interval '6 months';
 ```
 
-### 8-3. 설문과 연결 (나중에)
+### 8-3. 설문 (11/27 추가, 팀 확정안)
 
-- 설문 링크에 익명 `user_id`를 붙여서 열면 설문 응답과 로그를 사람 단위로 이을 수 있다. 예: `설문주소?uid=<user_id>`
 - 로그 = **무엇을 했나** / 설문 = **왜 그랬나, 누구인가(나이대 · 성별)**
-- 1차는 돌수제비만 설문을 붙인다. 옷빨에 붙일 때 결과 화면 버튼 + `survey_open` 이벤트를 같이 추가한다.
+- 게임 안 설문 카드(`components/SurveyCard.tsx`, 설정 `lib/survey-config.ts`). 응답은 따로 표 없이 `events`에 같은 `user_id`로 쌓인다 → 유입 경로 · 재방문 로그와 바로 합침
+- 이벤트는 `survey_view` · `survey_close` · `survey_submit` 3개 (`survey_open`은 안 씀). 자세한 규칙 · 문항 · 저장 값 · SQL은 `docs/survey-otbbal.md`
+
+| event_name | 언제 | props |
+| --- | --- | --- |
+| `survey_view` | 카드가 떴을 때 | `survey_id`, `show_index`, `result_count`(누적 결과 횟수), `mode` |
+| `survey_close` | 제출 안 하고 닫음 (나중에 · 바깥 탭 · Esc) | `survey_id`, `show_index`, `last_question`(1~4), `answered_so_far` |
+| `survey_submit` | 4문항 다 답함 (자동 제출) | `survey_id`, `show_index`, `result_count`, `mode`, `age`, `gender`, `reasons`, `reasons_other`, `revisit`, `option_order`, `seconds_to_submit` |
+
+- `stage`는 셋 다 5
 
 ### 8-4. 2차 이후 추가 후보 (지금은 안 심음)
 
@@ -502,6 +510,7 @@ delete from public.events where event_time < now() - interval '6 months';
 - [ ] 비로그인으로 새 사진 배틀 4판째(새 사진 7장째)에서 `login_prompt`가 찍힘
 - [ ] 7분 넘게 가만히 있다가 다시 누르면 새 `session_id` + `visit`
 - [ ] 랭킹 닉네임 등록하면 `ranking_register` 찍힘
+- [x] 설문: 📏 창 닫고 1.5초 뒤 뜸 → `survey_view` / 나중에 · 바깥 탭 → `survey_close`(last_question, answered_so_far) / 4문항 → `survey_submit` (팀 표시 상태, 개발 서버 확인)
 - [x] A(스레드 post01) → B → C 공유: 링크에 `s` · `g`가 붙고, B는 `from_user=A앞8자리, gen=1`, C는 `from_user=B앞8자리, gen=2` (개발 서버 확인)
 - [x] `room_create` · `room_open`에 같은 방 코드 (개발 서버 확인)
 - [x] 결과가 뜨면 점수 올리는 법 창이 열리고 `score_guide show` → 닫기 `close`(sec_open) → 📏 버튼 `reopen` → 기준표 펼치기 `expand` (개발 서버 확인)

@@ -1,6 +1,7 @@
 "use client";
 
 import { RUBRIC, type BattleResult } from "./rubric";
+import { RESULT_EVENT, RESULT_LEAVE_EVENT, TIPS_CLOSED_EVENT, type ResultDetail } from "./survey-config";
 import * as T from "./track";
 
 // 프로토타입의 화면 동작을 거의 그대로 옮겼다.
@@ -274,6 +275,7 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
     $("tips").hidden = true;
     $("btn-tips").hidden = true;
     tipsAt = 0;
+    window.dispatchEvent(new Event(RESULT_LEAVE_EVENT)); // 설문: 이번 결과에서는 안 띄움
     S.running = false;
     setStart();
   }
@@ -402,6 +404,8 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
     $("btn-copy").hidden = false;
     $("btn-share").hidden = false;
     showTips(r, true);
+    // 설문 카드(components/SurveyCard.tsx)에 "결과 하나 뜸" 알림. 구경만(viewer) · 가짜 채점은 설문 쪽에서 거른다
+    window.dispatchEvent(new CustomEvent<ResultDetail>(RESULT_EVENT, { detail: { mode: mode(), mock: !!r.mock, viewer: role === "viewer" } }));
     S.running = false; setStart();
     confetti(r.winner);
     fanfare(); sadTrombone();
@@ -686,6 +690,7 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
     if (S.result) {
       tipsLog("close", S.result, { sec_open: tipsAt ? Math.round((Date.now() - tipsAt) / 1000) : null });
       $("btn-tips").hidden = false;
+      window.dispatchEvent(new Event(TIPS_CLOSED_EVENT)); // 설문: 닫고 1.5초 뒤에 뜰 수 있음
     }
     tipsAt = 0;
   });
@@ -710,6 +715,7 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
     setStatus("사진 두 장 올리고 START 누르셈");
   });
   on($("btn-share"), "click", () => {
+    window.dispatchEvent(new Event(RESULT_LEAVE_EVENT));
     if (S.result) onShare(asMine(S.result, mySide()), S[mySide()]?.blob ?? null);
   });
   on($("btn-copy"), "click", async () => {

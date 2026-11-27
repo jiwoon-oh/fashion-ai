@@ -18,6 +18,9 @@ export const OTBBAL_EVENTS = [
   "friends_view",
   "setting_change",
   "score_guide",
+  "survey_view",
+  "survey_close",
+  "survey_submit",
 ] as const;
 
 export type EventName = (typeof COMMON_EVENTS)[number] | (typeof OTBBAL_EVENTS)[number];
