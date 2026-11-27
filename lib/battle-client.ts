@@ -767,7 +767,10 @@ export function initBattle({ loggedIn, onShare, room, onRoom }: InitOpts): () =>
         const res = await fetch("/api/share", { method: "POST", body: fd });
         const data = await res.json().catch(() => ({}));
         if (res.ok && data.code && S.result === r) code = shareCode = data.code;
-      } catch { /* 링크 없이 홈 주소로 공유 */ }
+        else setStatus(`공유 링크를 못 만들어서 홈 링크로 공유함 (${data?.error || res.status})`, "small");
+      } catch {
+        setStatus("공유 링크를 못 만들어서 홈 링크로 공유함 (network)", "small");
+      }
       btn.disabled = false; btn.textContent = label;
     }
     const link = code ? { url: `${location.origin}/r/${code}`, image: `${location.origin}/r/${code}/og` } : null;
